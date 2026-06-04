@@ -2,21 +2,19 @@ import { formatMoney } from "@/lib/currency";
 import type {
   FinancialAssumptions,
   FinancialSnapshot,
-  MonthlyProjection,
   OnboardingProfile,
 } from "@/lib/types/domain";
 import { createProvenance } from "@/lib/db/provenance";
 import { sanitizeAssumptions } from "@/lib/research/assumption-bounds";
-import {
-  expenseForMonth,
-  migrateAssumptionsToLineItems,
-} from "@/lib/research/expense-line-items";
+import { migrateAssumptionsToLineItems } from "@/lib/research/expense-line-items";
+import { simulateServiceBusinessMonths } from "@/lib/research/service-projection-engine";
 
 export function defaultAssumptions(profile: OnboardingProfile): FinancialAssumptions {
   const months = Math.max(1, profile.goalMonths);
   const mrrDelta = profile.targetMrr - profile.currentMrr;
   const monthlyGrowth = mrrDelta / months;
   const isInr = profile.currency === "INR";
+  const avgMid = isInr ? 150000 : 5000;
 
   const base = {
     averageTicketUs: isInr ? 5000 * 85 : 5000,
@@ -32,38 +30,20 @@ export function defaultAssumptions(profile: OnboardingProfile): FinancialAssumpt
     marketingSpend: Math.max(500, profile.currentMrr * 0.1),
     toolingSpend: 500,
     retentionRate: 0.9,
+    dealMixLowFrequency: 0.45,
+    dealMixMidTicket: 0.35,
+    dealMixHighTicket: 0.15,
+    dealMixWhale: 0.05,
+    ticketLow: Math.round(avgMid * 0.35),
+    ticketMid: avgMid,
+    ticketHigh: Math.round(avgMid * 2.5),
+    ticketWhale: Math.round(avgMid * 10),
+    monthsWithZeroCashPct: 0.18,
+    retainerConversionRate: 0.25,
+    retainerMrrFraction: 0.35,
   };
 
   return migrateAssumptionsToLineItems(base, profile, base);
-}
-
-/** Linear MRR ramp from current → target over the horizon. */
-function plannedMrr(profile: OnboardingProfile, month: number): number {
-  const months = Math.max(1, profile.goalMonths);
-  const t = month / months;
-  return profile.currentMrr + (profile.targetMrr - profile.currentMrr) * t;
-}
-
-function monthlyExpenses(assumptions: FinancialAssumptions, month: number) {
-  const items = assumptions.expenseLineItems ?? [];
-  if (items.length > 0) {
-    return expenseForMonth(items, month);
-  }
-  const legacy =
-    assumptions.marketingSpend +
-    assumptions.toolingSpend +
-    (month === assumptions.hiringMonth ? assumptions.hiringCost : 0);
-  return {
-    total: legacy,
-    byLine: {} as Record<string, number>,
-    byCategory: {
-      people: month === assumptions.hiringMonth ? assumptions.hiringCost : 0,
-      tools: assumptions.toolingSpend,
-      marketing: assumptions.marketingSpend,
-      operations: 0,
-      other: 0,
-    },
-  };
 }
 
 export function buildProjections(
@@ -76,48 +56,20 @@ export function buildProjections(
   const defaults = defaultAssumptions(profile);
   const assumptions = sanitizeAssumptions(profile, rawAssumptions, defaults);
 
-  const projections: MonthlyProjection[] = [];
-  let cumulativeMrr = 0;
+  const { projections, finalRecurringMrr } = simulateServiceBusinessMonths(
+    profile,
+    assumptions,
+    months,
+    profile.businessName,
+  );
 
-  const avgTicket =
-    profile.regions.includes("India") && profile.regions.includes("US")
-      ? (assumptions.averageTicketUs + assumptions.averageTicketIndia) / 2
-      : profile.regions.includes("India")
-        ? assumptions.averageTicketIndia
-        : assumptions.averageTicketUs;
-
-  for (let m = 1; m <= months; m++) {
-    const mrr = Math.round(plannedMrr({ ...profile, goalMonths: months }, m));
-    cumulativeMrr += mrr;
-    const expenseBreakdown = monthlyExpenses(assumptions, m);
-    const expenses = Math.round(expenseBreakdown.total);
-    const gapRemaining = profile.targetMrr - mrr;
-    const pipelineNeeded =
-      gapRemaining > 0
-        ? gapRemaining / Math.max(1, assumptions.closeRate * avgTicket)
-        : 0;
-
-    projections.push({
-      month: m,
-      revenue: mrr,
-      cumulativeRevenue: Math.round(cumulativeMrr),
-      expenses,
-      investment: expenses,
-      pipelineNeeded: Math.max(0, Math.round(pipelineNeeded)),
-      netMrr: mrr - expenses,
-      expenseByCategory: expenseBreakdown.byCategory,
-      expenseByLineItem: expenseBreakdown.byLine,
-    });
-  }
-
-  const finalMrr = projections[projections.length - 1]?.revenue ?? profile.currentMrr;
-  const gapToGoal = Math.round(profile.targetMrr - finalMrr);
+  const gapToGoal = Math.round(profile.targetMrr - finalRecurringMrr);
   const monthlyPaceRequired =
     months > 0
       ? Math.round((profile.targetMrr - profile.currentMrr) / months)
       : 0;
 
-  const base = projections.map((p) => p.revenue);
+  const base = projections.map((p) => p.recurringMrr ?? p.revenue);
   const scenarios = {
     conservative: base.map((r) => Math.round(r * 0.85)),
     base,
@@ -157,12 +109,12 @@ export function buildProjections(
         : [
             "Increase lead volume",
             "Improve call-to-close rate",
-            "Raise average ticket size",
-            "Expand delivery capacity",
+            "Land more mid-ticket and retainer deals",
+            "Reduce months with zero new cash",
           ],
     narrative:
       narrative ||
-      `Plan a linear path from ${formatMoney(profile.currentMrr, profile.currency)} to ${formatMoney(profile.targetMrr, profile.currency)} target MRR over ${months} months. Monthly operating spend is broken down by expense line items (people, tools, marketing, operations) and modeled separately from MRR.`,
+      `Service-business model from ${formatMoney(profile.currentMrr, profile.currency)} starting MRR toward ${formatMoney(profile.targetMrr, profile.currency)} over ${months} months. Revenue is lumpy: mix of low-frequency small deals, mid-ticket projects, rare whales, and retainers—some months may show zero new cash while recurring MRR steps up gradually.`,
     provenance: createProvenance("ai"),
   };
 }

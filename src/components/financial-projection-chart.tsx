@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Bar,
   CartesianGrid,
@@ -23,12 +24,18 @@ export function FinancialProjectionChart({
   currency: string;
   showExpenseBreakdown?: boolean;
 }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const hasBreakdown = projections.some((p) => p.expenseByCategory);
+  const hasServiceModel = projections.some((p) => p.cashCollected != null);
+
   const data = projections.map((p) => ({
     month: `M${p.month}`,
-    mrr: p.revenue,
+    mrr: p.recurringMrr ?? p.revenue,
+    cash: p.cashCollected ?? p.revenue,
     expenses: p.expenses ?? p.investment,
-    net: p.netMrr ?? p.revenue - (p.expenses ?? p.investment),
+    net: p.netCash ?? p.netMrr ?? (p.cashCollected ?? p.revenue) - (p.expenses ?? p.investment),
     people: p.expenseByCategory?.people ?? 0,
     tools: p.expenseByCategory?.tools ?? 0,
     marketing: p.expenseByCategory?.marketing ?? 0,
@@ -38,8 +45,16 @@ export function FinancialProjectionChart({
 
   const fmt = (v: number) => formatMoney(v, currency);
 
+  if (!mounted || projections.length === 0) {
+    return (
+      <div className="flex h-80 min-h-[320px] min-w-0 items-center justify-center rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-400">
+        Loading chart…
+      </div>
+    );
+  }
+
   return (
-    <div className="h-80 w-full rounded-xl border border-slate-100 bg-white p-4">
+    <div className="h-80 min-h-[320px] min-w-0 w-full rounded-xl border border-slate-100 bg-white p-4">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -66,23 +81,53 @@ export function FinancialProjectionChart({
               radius={[2, 2, 0, 0]}
             />
           )}
-          <Line
-            type="monotone"
-            dataKey="mrr"
-            name="Planned MRR"
-            stroke="#7c3aed"
-            strokeWidth={2}
-            dot={false}
-          />
-          <Line
-            type="monotone"
-            dataKey="net"
-            name="MRR − expenses"
-            stroke="#0ea5e9"
-            strokeWidth={1.5}
-            strokeDasharray="4 4"
-            dot={false}
-          />
+          {hasServiceModel ? (
+            <>
+              <Bar
+                dataKey="cash"
+                name="Cash collected"
+                fill="#86efac"
+                radius={[2, 2, 0, 0]}
+              />
+              <Line
+                type="stepAfter"
+                dataKey="mrr"
+                name="Recurring MRR"
+                stroke="#7c3aed"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="net"
+                name="Net cash"
+                stroke="#0ea5e9"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                dot={false}
+              />
+            </>
+          ) : (
+            <>
+              <Line
+                type="monotone"
+                dataKey="mrr"
+                name="Planned MRR"
+                stroke="#7c3aed"
+                strokeWidth={2}
+                dot={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="net"
+                name="MRR − expenses"
+                stroke="#0ea5e9"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                dot={false}
+              />
+            </>
+          )}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

@@ -11,7 +11,13 @@ type RawItem = {
   description: string;
   priority: string;
   region: string | null;
+  regions?: string[];
+  channels?: string[];
   why?: string;
+  whyForBusiness?: string;
+  runDuration?: string;
+  operatorType?: string;
+  executionNotes?: string;
   expectedMetrics?: Array<{ label: string; value: string; unit?: string }>;
   precedents?: Array<{
     company: string;
@@ -20,7 +26,10 @@ type RawItem = {
     metric?: string;
     sourceUri?: string;
   }>;
+  successCases?: RawItem["precedents"];
+  failureCases?: RawItem["precedents"];
   estimatedCost?: number;
+  estimatedRunCost?: number;
 };
 
 function toEnrichedItems(
@@ -38,10 +47,19 @@ function toEnrichedItems(
       description: item.description,
       priority: item.priority as MarketingItem["priority"],
       region: item.region ?? undefined,
+      regions: (item.regions ?? (item.region ? [item.region] : [])) as MarketingItem["regions"],
+      channels: item.channels,
       why: enriched?.why ?? item.why,
+      whyForBusiness: enriched?.whyForBusiness ?? item.whyForBusiness ?? item.why,
+      runDuration: item.runDuration,
+      operatorType: item.operatorType,
+      executionNotes: item.executionNotes,
       expectedMetrics: enriched?.expectedMetrics ?? item.expectedMetrics,
       precedents: enriched?.precedents ?? item.precedents,
+      successCases: enriched?.successCases ?? item.successCases,
+      failureCases: enriched?.failureCases ?? item.failureCases,
       estimatedCost: enriched?.estimatedCost ?? item.estimatedCost,
+      estimatedRunCost: enriched?.estimatedRunCost ?? item.estimatedRunCost,
       estimatedCostCurrency: currency,
       citations,
       provenance: createProvenance("search", citations, 0.82),
@@ -72,7 +90,9 @@ export async function runEnrichedMarketing(
       "Marketing strategist. Each item needs why, metrics, precedents with results. JSON only.",
     userPrompt: `${marketingPrompt(profile)}
 
-Extend each item with: why (for this business), expectedMetrics[], precedents[] (company, action, reportedResult, metric), estimatedCost in ${profile.currency}.`,
+For each campaign item include Google Search citations (title + uri). Regions: ${profile.regions.join(", ")}. All costs in ${profile.currency}.
+
+Extend each item with: whyForBusiness, regions[], channels[], runDuration, operatorType (in-house|agency), executionNotes, expectedMetrics[], precedents[], successCases[], failureCases[] (company, action, reportedResult, metric, sourceUri), estimatedCost and estimatedRunCost in ${profile.currency}.`,
     useGoogleSearch: true,
     parse: (raw) => raw as {
       positioning: string;

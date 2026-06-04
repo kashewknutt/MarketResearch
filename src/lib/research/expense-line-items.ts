@@ -1,4 +1,4 @@
-import { randomUUID } from "crypto";
+import { newId } from "@/lib/id";
 import type {
   ExpenseCategory,
   ExpenseLineItem,
@@ -7,7 +7,7 @@ import type {
 } from "@/lib/types/domain";
 
 export function newExpenseLineId(): string {
-  return randomUUID();
+  return newId();
 }
 
 /** Default rows tailored to service domain (AI fills amounts on first run). */

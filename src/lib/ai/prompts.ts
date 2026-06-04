@@ -73,6 +73,8 @@ export function investmentPrompt(
 ): string {
   return `Investment allocation for ${profile.businessName}. Current MRR ${formatMoney(profile.currentMrr, profile.currency)}, target MRR ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months. Monthly MRR gap ~${formatMoney(gapToGoal, profile.currency)}.
 
+IMPORTANT: All monetary amounts must be in ${profile.currency} only — do not use USD unless profile currency is USD.
+
 Return JSON: {
   "totalRecommended": number,
   "allocations": [{ "category": string, "amount": number, "percentage": number, "rationale": string, "expectedOutcome": string }]
@@ -99,8 +101,19 @@ Return JSON: {
   "marketingSpend": number,
   "toolingSpend": number,
   "retentionRate": number (0-1),
+  "dealMixLowFrequency": number (0-1),
+  "dealMixMidTicket": number (0-1),
+  "dealMixHighTicket": number (0-1),
+  "dealMixWhale": number (0-1),
+  "ticketLow": number,
+  "ticketMid": number,
+  "ticketHigh": number,
+  "ticketWhale": number,
+  "monthsWithZeroCashPct": number (0-0.4),
+  "retainerConversionRate": number (0-1),
+  "retainerMrrFraction": number (0-1),
   "expenseLineItems": [{ "id": string, "name": string, "category": "people"|"tools"|"marketing"|"operations"|"other", "monthlyAmount": number, "headcount": number?, "unitCost": number?, "notes": string? }],
-  "narrative": string,
+  "narrative": string (note lumpy service revenue, not smooth MRR ramp),
   "leverageVariables": string[]
 }`;
 }

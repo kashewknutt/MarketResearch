@@ -159,21 +159,48 @@ export interface FinancialAssumptions {
   retentionRate: number;
   /** Domain-specific monthly cost rows (developers, ads, AI tools, etc.). */
   expenseLineItems: ExpenseLineItem[];
+  /** Service-business simulation (optional; defaults applied in engine). */
+  dealMixLowFrequency?: number;
+  dealMixMidTicket?: number;
+  dealMixHighTicket?: number;
+  dealMixWhale?: number;
+  ticketLow?: number;
+  ticketMid?: number;
+  ticketHigh?: number;
+  ticketWhale?: number;
+  monthsWithZeroCashPct?: number;
+  retainerConversionRate?: number;
+  retainerMrrFraction?: number;
+}
+
+export interface MonthlyDealBreakdown {
+  lowTicket: number;
+  midTicket: number;
+  highTicket: number;
+  whale: number;
+  newRetainers: number;
 }
 
 export interface MonthlyProjection {
   month: number;
-  /** Planned monthly recurring revenue for this month. */
+  /** Recurring MRR at end of month (stepwise, not linear). */
   revenue: number;
-  /** Running sum of monthly MRR (not ARR). */
+  /** Running sum of monthly MRR. */
   cumulativeRevenue: number;
-  /** Monthly operating expenses (marketing + tooling + hiring). */
+  /** Cash collected from new deals this month (can be 0). */
+  cashCollected?: number;
+  /** Recurring MRR (same as revenue when using service model). */
+  recurringMrr?: number;
+  /** Monthly operating expenses. */
   expenses: number;
-  /** @deprecated Use expenses — kept for backward compatibility */
+  /** @deprecated Use expenses */
   investment: number;
   pipelineNeeded: number;
-  /** MRR minus monthly expenses. */
+  /** Net cash = cashCollected - expenses. */
+  netCash?: number;
+  /** @deprecated Prefer netCash */
   netMrr: number;
+  newContracts?: MonthlyDealBreakdown;
   expenseByCategory?: Partial<Record<ExpenseCategory, number>>;
   expenseByLineItem?: Record<string, number>;
 }
@@ -202,11 +229,20 @@ export interface MarketingItem {
   description: string;
   priority: "high" | "medium" | "low";
   region?: RegionCode;
+  regions?: RegionCode[];
   provenance: Provenance;
   why?: string;
+  whyForBusiness?: string;
+  channels?: string[];
+  runDuration?: string;
+  operatorType?: string;
+  executionNotes?: string;
   expectedMetrics?: EvidenceMetric[];
   precedents?: PrecedentRecord[];
+  successCases?: PrecedentRecord[];
+  failureCases?: PrecedentRecord[];
   estimatedCost?: number;
+  estimatedRunCost?: number;
   estimatedCostCurrency?: string;
   citations?: Citation[];
 }
@@ -247,6 +283,10 @@ export interface LeadRecord {
   signals: string[];
   contactHints: string;
   whyFit: string;
+  whyPerfect?: string;
+  pitchOutline?: string;
+  contactPlan?: string;
+  objections?: string[];
   sources: Citation[];
   status: LeadStatus;
   provenance: Provenance;

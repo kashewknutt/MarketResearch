@@ -5,6 +5,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { CitationList } from "@/components/ui/citation-list";
 import { Tabs } from "@/components/ui/tabs";
+import { CampaignDetailSheet } from "@/components/campaign-detail-sheet";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { formatMoney } from "@/lib/currency";
 import type {
@@ -46,6 +47,7 @@ export default function MarketingPage() {
   const [marketing, setMarketing] = useState<MarketingSnapshot | null>(null);
   const [social, setSocial] = useState<MarketingSocialSnapshot | null>(null);
   const [currency, setCurrency] = useState("USD");
+  const [selectedCampaign, setSelectedCampaign] = useState<MarketingItem | null>(null);
 
   useEffect(() => {
     fetch("/api/marketing")
@@ -100,17 +102,17 @@ export default function MarketingPage() {
 
       {tab === "campaigns" && (
         <div className="space-y-6">
-          <DataTable data={allCampaigns} columns={campaignColumns(currency)} />
-          {allCampaigns[0] && (
-            <div className="rounded-xl border border-slate-100 p-4">
-              <p className="text-sm font-medium text-slate-800">Sample precedent</p>
-              {allCampaigns[0].precedents?.[0] && (
-                <p className="mt-2 text-xs text-slate-600">
-                  {allCampaigns[0].precedents[0].company}: {allCampaigns[0].precedents[0].reportedResult}
-                </p>
-              )}
-            </div>
-          )}
+          <p className="text-xs text-slate-500">Click a row for full campaign dossier.</p>
+          <DataTable
+            data={allCampaigns}
+            columns={campaignColumns(currency)}
+            onRowClick={(row) => setSelectedCampaign(row)}
+          />
+          <CampaignDetailSheet
+            campaign={selectedCampaign}
+            currency={currency}
+            onClose={() => setSelectedCampaign(null)}
+          />
         </div>
       )}
 

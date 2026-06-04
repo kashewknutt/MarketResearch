@@ -32,7 +32,7 @@ export async function runLeadDiscovery(
 Audience: ${profile.targetAudience}
 Your company LinkedIn page (context only, no API): ${linkedInPage ?? "N/A"}
 
-Return JSON: { "leads": [{ "company": string, "region": "${region}", "fitScore": number, "signals": string[], "contactHints": string, "whyFit": string, "sources": [{ "title": string, "uri": string }] }] }`,
+Return JSON: { "leads": [{ "company": string, "region": "${region}", "fitScore": number, "signals": string[], "contactHints": string, "whyFit": string, "whyPerfect": string, "pitchOutline": string (what to say), "contactPlan": string (step-by-step outreach), "objections": string[], "sources": [{ "title": string, "uri": string }] }] }`,
       useGoogleSearch: true,
       parse: (raw) => raw as { leads: Array<Record<string, unknown>> },
       trace,
@@ -49,6 +49,10 @@ Return JSON: { "leads": [{ "company": string, "region": "${region}", "fitScore":
         signals: parsed.signals,
         contactHints: parsed.contactHints,
         whyFit: parsed.whyFit,
+        whyPerfect: parsed.whyPerfect,
+        pitchOutline: parsed.pitchOutline,
+        contactPlan: parsed.contactPlan,
+        objections: parsed.objections,
         sources: parsed.sources,
         status: "new",
         provenance: createProvenance("search", result.citations, 0.75),

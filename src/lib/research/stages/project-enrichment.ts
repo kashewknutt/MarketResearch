@@ -4,11 +4,23 @@ import { createProvenance } from "@/lib/db/provenance";
 import { runPipeline } from "@/lib/agents/pipeline";
 import { enrichedProjectSchema, safeParse } from "@/lib/agents/validate";
 import { fetchRedditSignals } from "@/lib/integrations/reddit";
-import type { MarketProject, OnboardingProfile } from "@/lib/types/domain";
+import type { Citation, MarketProject, OnboardingProfile } from "@/lib/types/domain";
 import { getProjectsByRegion, saveProject } from "@/lib/store/projects";
 import { getDb } from "@/lib/db/client";
 import { projects as projectsTable } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+
+function mergeCitations(...groups: Citation[][]): Citation[] {
+  const seen = new Set<string>();
+  const out: Citation[] = [];
+  for (const c of groups.flat()) {
+    const key = `${c.uri ?? ""}|${c.title}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+  }
+  return out;
+}
 
 interface Ctx {
   profile: OnboardingProfile;
@@ -75,16 +87,46 @@ Return JSON:
             });
 
             const parsed = safeParse(enrichedProjectSchema, result.data);
+            const precedents = parsed?.precedents ?? [];
+            const regionalPricing = parsed?.regionalPricing ?? [];
+            const fromPrecedents: Citation[] = precedents
+              .filter((p) => p.sourceUri)
+              .map((p) => ({
+                title: p.sourceTitle ?? `${p.company} precedent`,
+                uri: p.sourceUri,
+              }));
+            const fromPricing = regionalPricing.flatMap((rp) => rp.citations);
+            const citations = mergeCitations(
+              result.citations,
+              fromPricing,
+              fromPrecedents,
+            );
+            const hasUrl = citations.some((x) => x.uri?.trim());
+            const hasPrecedentEvidence =
+              precedents.length > 0 || regionalPricing.length > 0;
+
+            let explanation = c.project.explanation;
+            if (!hasUrl && hasPrecedentEvidence) {
+              explanation = `${explanation}\n\nNo traceable URLs in search results; see precedent and regional pricing evidence below.`;
+            } else if (!hasUrl && !hasPrecedentEvidence) {
+              explanation = `${explanation}\n\nLimited public evidence — estimates are AI-assisted; re-run research after adding integrations.`;
+            }
+
             const enriched: MarketProject = {
               ...c.project,
               rationale: parsed?.rationale ?? String(result.data.rationale ?? ""),
               challenges: parsed?.challenges ?? [],
               solutions: parsed?.solutions ?? [],
-              regionalPricing: parsed?.regionalPricing ?? [],
-              precedents: parsed?.precedents ?? [],
+              regionalPricing,
+              precedents,
               confidenceScore: parsed?.confidenceScore ?? 0.7,
               pipelineSteps: ["integrations", "synthesize"],
-              provenance: createProvenance("search", result.citations, 0.85),
+              explanation,
+              provenance: createProvenance(
+                hasUrl ? "search" : "ai",
+                citations,
+                hasUrl ? 0.85 : 0.55,
+              ),
             };
             const db = getDb();
             const row = await db

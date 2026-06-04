@@ -4,10 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExpenseLineItemsEditor } from "@/components/expense-line-items-editor";
 import { FinancialProjectionChart } from "@/components/financial-projection-chart";
 import { EditableField } from "@/components/editable-field";
-import {
-  migrateAssumptionsToLineItems,
-  syncLegacySpendFields,
-} from "@/lib/research/expense-line-items";
+import { syncLegacySpendFields } from "@/lib/research/expense-line-items";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { MetricCard } from "@/components/ui/metric-card";
 import { formatMoney } from "@/lib/currency";
@@ -29,19 +26,8 @@ export default function FinancialAnalysisPage() {
       .then((d) => {
         setStored(d.financial);
         setProfile(d.profile ?? null);
-        if (d.financial?.assumptions?.value && d.profile) {
-          const defaults = migrateAssumptionsToLineItems(
-            {},
-            d.profile,
-            d.financial.assumptions.value,
-          );
-          setAssumptions(
-            migrateAssumptionsToLineItems(
-              d.financial.assumptions.value,
-              d.profile,
-              defaults,
-            ),
-          );
+        if (d.financial?.assumptions?.value) {
+          setAssumptions(d.financial.assumptions.value);
         }
       });
   }, []);
@@ -100,6 +86,10 @@ export default function FinancialAnalysisPage() {
       <header>
         <h1 className="text-2xl font-semibold text-slate-800">Financial Analysis</h1>
         <p className="mt-1 text-sm text-slate-500">{financial.narrative}</p>
+        <p className="mt-2 text-xs text-slate-500">
+          Service businesses have lumpy revenue: the chart simulates deal closes and retainers
+          (some months may show zero new cash) rather than a smooth MRR ramp.
+        </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -112,7 +102,7 @@ export default function FinancialAnalysisPage() {
           label="Required MRR growth / month"
           value={money(financial.monthlyPaceRequired)}
           currency={currency}
-          hint="Linear path from current to target"
+          hint="Average pace if MRR grew evenly (actual path is lumpy)"
         />
         <MetricCard
           label="Horizon"
@@ -203,7 +193,7 @@ export default function FinancialAnalysisPage() {
 
       <section>
         <h2 className="mb-4 text-sm font-semibold text-slate-700">
-          MRR & monthly expenses ({currency})
+          Cash, recurring MRR & expenses ({currency})
         </h2>
         <FinancialProjectionChart
           projections={financial.projections}
@@ -218,19 +208,29 @@ export default function FinancialAnalysisPage() {
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-4 py-2">Month</th>
-                <th className="px-4 py-2">MRR ({currency})</th>
+                <th className="px-4 py-2">Cash in</th>
+                <th className="px-4 py-2">MRR</th>
                 <th className="px-4 py-2">Expenses</th>
-                <th className="px-4 py-2">Net</th>
+                <th className="px-4 py-2">Net cash</th>
               </tr>
             </thead>
             <tbody>
               {financial.projections.map((p) => (
                 <tr key={p.month} className="border-t border-slate-50">
                   <td className="px-4 py-2">{p.month}</td>
-                  <td className="px-4 py-2">{money(p.revenue)}</td>
+                  <td className="px-4 py-2">
+                    {money(p.cashCollected ?? 0)}
+                  </td>
+                  <td className="px-4 py-2">
+                    {money(p.recurringMrr ?? p.revenue)}
+                  </td>
                   <td className="px-4 py-2">{money(p.expenses ?? p.investment)}</td>
                   <td className="px-4 py-2">
-                    {money(p.netMrr ?? p.revenue - (p.expenses ?? p.investment))}
+                    {money(
+                      p.netCash ??
+                        p.netMrr ??
+                        (p.cashCollected ?? p.revenue) - (p.expenses ?? p.investment),
+                    )}
                   </td>
                 </tr>
               ))}

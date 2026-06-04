@@ -34,17 +34,28 @@ export const enrichedProjectSchema = z.object({
 });
 
 export const marketingItemEnrichedSchema = z.object({
-  why: z.string(),
-  expectedMetrics: z.array(
-    z.object({
-      label: z.string(),
-      value: z.string(),
-      unit: z.string().optional(),
-    }),
-  ),
-  precedents: z.array(precedentSchema),
+  why: z.string().optional(),
+  whyForBusiness: z.string().optional(),
+  regions: z.array(z.string()).optional(),
+  channels: z.array(z.string()).optional(),
+  runDuration: z.string().optional(),
+  operatorType: z.string().optional(),
+  executionNotes: z.string().optional(),
+  expectedMetrics: z
+    .array(
+      z.object({
+        label: z.string(),
+        value: z.string(),
+        unit: z.string().optional(),
+      }),
+    )
+    .optional(),
+  precedents: z.array(precedentSchema).optional(),
+  successCases: z.array(precedentSchema).optional(),
+  failureCases: z.array(precedentSchema).optional(),
   estimatedCost: z.number().optional(),
   estimatedCostCurrency: z.string().optional(),
+  estimatedRunCost: z.number().optional(),
 });
 
 export const leadSchema = z
@@ -55,11 +66,15 @@ export const leadSchema = z
     signals: z.array(z.string()),
     contactHints: z.string(),
     whyFit: z.string().optional(),
+    whyPerfect: z.string().optional(),
+    pitchOutline: z.string().optional(),
+    contactPlan: z.string().optional(),
+    objections: z.array(z.string()).optional(),
     sources: z.array(citationSchema).min(1),
   })
   .transform((d) => ({
     ...d,
-    whyFit: d.whyFit ?? "",
+    whyFit: d.whyFit ?? d.whyPerfect ?? "",
   }));
 
 export const competitorSchema = z.object({

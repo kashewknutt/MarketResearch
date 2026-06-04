@@ -42,6 +42,29 @@ export function buildAdAnalyticsUrl(params: {
   return `https://api.linkedin.com/rest/adAnalytics?${query}`;
 }
 
+export function buildAdStatisticsUrl(params: {
+  accountId: string;
+  dateRange: string;
+  timeGranularity?: string;
+  fields?: string;
+}): string {
+  const accountUrn = `urn:li:sponsoredAccount:${params.accountId}`;
+  const parts = [
+    ["q", "statistics"],
+    ["pivots", linkedInListUrn("ACCOUNT")],
+    ["timeGranularity", params.timeGranularity ?? "MONTHLY"],
+    ["dateRange", params.dateRange],
+    ["accounts", linkedInListUrn(accountUrn)],
+  ];
+  if (params.fields) parts.push(["fields", params.fields]);
+
+  const query = parts
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join("&");
+
+  return `https://api.linkedin.com/rest/adStatistics?${query}`;
+}
+
 export function datePartsFromDate(d: Date): LinkedInDateParts {
   return {
     year: d.getFullYear(),
@@ -55,15 +78,17 @@ export type AdAnalyticsRow = {
   amount: number;
 };
 
+type AnalyticsElement = {
+  costInLocalCurrency?: string;
+  spend?: { amount?: string; currencyCode?: string };
+  dateRange?: {
+    start?: { year?: number; month?: number; day?: number };
+    end?: { year?: number; month?: number; day?: number };
+  };
+};
+
 export function parseAdAnalyticsElements(
-  elements: Array<{
-    costInLocalCurrency?: string;
-    spend?: { amount?: string; currencyCode?: string };
-    dateRange?: {
-      start?: { year?: number; month?: number; day?: number };
-      end?: { year?: number; month?: number; day?: number };
-    };
-  }>,
+  elements: AnalyticsElement[],
 ): AdAnalyticsRow[] {
   return elements
     .map((el) => {
@@ -80,26 +105,18 @@ export function parseAdAnalyticsElements(
     .filter((x): x is AdAnalyticsRow => x !== null);
 }
 
-export async function fetchAdAnalyticsForAccount(
-  accountId: string,
-  options?: { monthsBack?: number },
+function logLinkedInApiError(label: string, status: number, body: string): void {
+  const detail = body.length > 4000 ? `${body.slice(0, 4000)}…` : body;
+  if (process.env.NODE_ENV === "development") {
+    console.warn(`LinkedIn ${label} ${status}:`, detail);
+  } else {
+    console.warn(`LinkedIn ${label} ${status}:`, body.slice(0, 500));
+  }
+}
+
+async function requestSpendRows(
+  url: string,
 ): Promise<{ ok: boolean; status: number; rows: AdAnalyticsRow[]; body?: string }> {
-  const now = new Date();
-  const start = new Date(now);
-  start.setMonth(start.getMonth() - (options?.monthsBack ?? 12));
-  start.setDate(1);
-
-  const url = buildAdAnalyticsUrl({
-    accountId,
-    dateRange: linkedInDateRange(
-      datePartsFromDate(start),
-      datePartsFromDate(now),
-    ),
-    pivot: "ACCOUNT",
-    timeGranularity: "MONTHLY",
-    fields: "costInLocalCurrency,dateRange",
-  });
-
   const res = await linkedInAuthorizedFetch(url, {
     headers: linkedInRestHeaders(),
   });
@@ -109,19 +126,95 @@ export async function fetchAdAnalyticsForAccount(
     return { ok: false, status: res.status, rows: [], body };
   }
 
-  const data = (await res.json()) as {
-    elements?: Array<{
-      costInLocalCurrency?: string;
-      spend?: { amount?: string };
-      dateRange?: { start?: { year?: number; month?: number } };
-    }>;
-  };
-
+  const data = (await res.json()) as { elements?: AnalyticsElement[] };
   return {
     ok: true,
     status: res.status,
     rows: parseAdAnalyticsElements(data.elements ?? []),
   };
+}
+
+export async function fetchAdAnalyticsForAccount(
+  accountId: string,
+  options?: { monthsBack?: number },
+): Promise<{ ok: boolean; status: number; rows: AdAnalyticsRow[]; body?: string }> {
+  const now = new Date();
+  const start = new Date(now);
+  start.setMonth(start.getMonth() - (options?.monthsBack ?? 12));
+  start.setDate(1);
+
+  const rangeWithEnd = linkedInDateRange(
+    datePartsFromDate(start),
+    datePartsFromDate(now),
+  );
+  const rangeStartOnly = linkedInDateRange(datePartsFromDate(start));
+
+  const attempts: { label: string; url: string }[] = [
+    {
+      label: "adAnalytics MONTHLY",
+      url: buildAdAnalyticsUrl({
+        accountId,
+        dateRange: rangeWithEnd,
+        pivot: "ACCOUNT",
+        timeGranularity: "MONTHLY",
+        fields: "dateRange,pivotValues,costInLocalCurrency",
+      }),
+    },
+    {
+      label: "adAnalytics ALL",
+      url: buildAdAnalyticsUrl({
+        accountId,
+        dateRange: rangeStartOnly,
+        pivot: "ACCOUNT",
+        timeGranularity: "ALL",
+        fields: "dateRange,pivotValues,costInLocalCurrency",
+      }),
+    },
+    {
+      label: "adStatistics MONTHLY",
+      url: buildAdStatisticsUrl({
+        accountId,
+        dateRange: rangeWithEnd,
+        timeGranularity: "MONTHLY",
+        fields: "dateRange,pivotValues,costInLocalCurrency",
+      }),
+    },
+    {
+      label: "adStatistics ALL",
+      url: buildAdStatisticsUrl({
+        accountId,
+        dateRange: rangeStartOnly,
+        timeGranularity: "ALL",
+        fields: "dateRange,pivotValues,costInLocalCurrency",
+      }),
+    },
+  ];
+
+  let last: { ok: boolean; status: number; rows: AdAnalyticsRow[]; body?: string } = {
+    ok: false,
+    status: 0,
+    rows: [],
+  };
+
+  for (const attempt of attempts) {
+    const result = await requestSpendRows(attempt.url);
+    last = result;
+    if (result.ok && result.rows.length > 0) {
+      return result;
+    }
+    if (!result.ok && result.body) {
+      logLinkedInApiError(attempt.label, result.status, result.body);
+      const illegal =
+        result.status === 400 &&
+        (result.body.includes("ILLEGAL_ARGUMENT") ||
+          result.body.includes("INVALID_PARAM"));
+      if (!illegal) {
+        return result;
+      }
+    }
+  }
+
+  return last;
 }
 
 /** Lightweight check: ad account exists and token can read it. */

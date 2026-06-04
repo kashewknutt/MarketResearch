@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
-import { CitationList } from "@/components/ui/citation-list";
+import { LeadDetailSheet } from "@/components/lead-detail-sheet";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import type { LeadRecord } from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -72,19 +72,7 @@ export default function LeadsPage() {
         onRowClick={(row) => setSelected(row)}
       />
 
-      {selected && (
-        <div className="rounded-xl border border-slate-100 bg-white p-5">
-          <h2 className="text-lg font-semibold text-slate-800">{selected.company}</h2>
-          <p className="mt-2 text-sm text-slate-600">{selected.whyFit}</p>
-          <p className="mt-2 text-xs text-slate-500">{selected.contactHints}</p>
-          <ul className="mt-3 list-inside list-disc text-xs text-slate-600">
-            {selected.signals.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-          <CitationList citations={selected.sources} />
-        </div>
-      )}
+      <LeadDetailSheet lead={selected} onClose={() => setSelected(null)} />
     </div>
   );
 }

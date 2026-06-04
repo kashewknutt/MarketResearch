@@ -19,11 +19,11 @@ async function fetchAdAnalyticsFromApi(
 ): Promise<LinkedInAdHistory | null> {
   const result = await fetchAdAnalyticsForAccount(accountId, { monthsBack: 12 });
   if (!result.ok) {
-    console.warn(
-      "LinkedIn adAnalytics:",
-      result.status,
-      result.body?.slice(0, 300),
-    );
+    const snippet =
+      process.env.NODE_ENV === "development"
+        ? result.body
+        : result.body?.slice(0, 500);
+    console.warn("LinkedIn ad spend fetch failed:", result.status, snippet);
     return null;
   }
 

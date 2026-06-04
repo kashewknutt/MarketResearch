@@ -20,6 +20,22 @@ export function normalizeCurrency(code?: string | null): string {
   return code.trim().toUpperCase().slice(0, 3);
 }
 
+/** Short symbol for editable amount fields (not full Intl formatting). */
+export function currencyInputPrefix(currency = DEFAULT_CURRENCY): string {
+  const code = normalizeCurrency(currency);
+  try {
+    const parts = new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: code,
+      currencyDisplay: "narrowSymbol",
+    }).formatToParts(0);
+    const sym = parts.find((p) => p.type === "currency")?.value;
+    return sym ?? code;
+  } catch {
+    return code;
+  }
+}
+
 export function formatMoney(amount: number, currency = DEFAULT_CURRENCY): string {
   const code = normalizeCurrency(currency);
   try {

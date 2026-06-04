@@ -166,6 +166,11 @@ function SettingsContent() {
         />
       </section>
 
+      <p className="text-xs text-slate-500">
+        Re-run research to refresh leads, financial model, and campaign dossiers after
+        profile or integration changes.
+      </p>
+
       <div className="flex flex-wrap gap-3">
         <button
           type="button"

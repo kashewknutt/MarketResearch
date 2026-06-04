@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { EditableField } from "@/components/editable-field";
 import { GeminiFallback } from "@/components/gemini-fallback";
-import { formatMoney } from "@/lib/currency";
+import { currencyInputPrefix, formatMoney } from "@/lib/currency";
 import type { InvestmentSnapshot, OnboardingProfile } from "@/lib/types/domain";
 
 export default function InvestmentPlannerPage() {
@@ -86,7 +86,7 @@ export default function InvestmentPlannerPage() {
                 label="Amount"
                 value={a.amount}
                 type="number"
-                prefix="$"
+                prefix={currencyInputPrefix(profile?.currency)}
                 onSave={(v) => patchAllocation(i, "amount", Number(v))}
               />
               <EditableField

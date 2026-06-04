@@ -1,10 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { EditableField } from "@/components/editable-field";
 import { CitationList } from "@/components/ui/citation-list";
 import { formatMoney } from "@/lib/currency";
-import type { MarketProject } from "@/lib/types/domain";
+import type { MarketProject, PrecedentRecord } from "@/lib/types/domain";
+
+function parsePrecedentMetric(metric?: string): number | null {
+  if (!metric) return null;
+  const m = metric.match(/[\d,.]+/);
+  if (!m) return null;
+  return parseFloat(m[0].replace(/,/g, ""));
+}
+
+function precedentChartRows(precedents: PrecedentRecord[]) {
+  return precedents.map((p, i) => ({
+    name: p.company.length > 18 ? `${p.company.slice(0, 16)}…` : p.company,
+    value: parsePrecedentMetric(p.metric) ?? (i + 1) * 10,
+    detail: p.metric ?? p.reportedResult,
+  }));
+}
 
 interface ProjectDetailSheetProps {
   project: MarketProject | null;
@@ -20,6 +44,16 @@ export function ProjectDetailSheet({
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [doneError, setDoneError] = useState<string | null>(null);
+  const [chartMounted, setChartMounted] = useState(false);
+
+  useEffect(() => setChartMounted(true), []);
+
+  const precedentChart = useMemo(
+    () => (project?.precedents?.length ? precedentChartRows(project.precedents) : []),
+    [project?.precedents],
+  );
+
+  const hasCitationUrls = (project?.provenance.citations ?? []).some((c) => c.uri?.trim());
 
   if (!project) return null;
 
@@ -175,8 +209,35 @@ export function ProjectDetailSheet({
 
         <section>
           <p className="text-sm font-medium text-slate-800">Sources</p>
+          {!hasCitationUrls && precedentChart.length > 0 ? (
+            <p className="mb-2 text-xs text-slate-500">
+              No URLs; see precedent chart below.
+            </p>
+          ) : null}
           <CitationList citations={project.provenance.citations} />
         </section>
+
+        {!hasCitationUrls && precedentChart.length > 0 && chartMounted && (
+          <section>
+            <p className="text-sm font-medium text-slate-800">Evidence from precedents</p>
+            <div className="mt-2 h-48 min-h-[12rem] min-w-0 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={precedentChart}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="name" tick={{ fontSize: 9 }} />
+                  <YAxis tick={{ fontSize: 9 }} />
+                  <Tooltip
+                    formatter={(v) => String(v)}
+                    labelFormatter={(_, payload) =>
+                      payload?.[0]?.payload?.detail ?? ""
+                    }
+                  />
+                  <Bar dataKey="value" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+        )}
 
         {doneError && (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">{doneError}</p>

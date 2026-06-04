@@ -92,7 +92,9 @@ After the dev server is running:
    - **Dashboard** — MRR, competitors, demand, leads  
    - **Financial Analysis** — MRR chart, domain-specific expense line items, optional LinkedIn ad history  
    - **Projects / Leads / Marketing / Strategy / Investment** — tables and evidence from research  
-   - **Settings** — Edit profile and re-run research  
+   - **Settings** — Edit profile and re-run research
+
+After prompt or schema updates (leads playbook, financial model, campaign dossiers), **re-run research** from Settings to refresh stored snapshots. Existing SQLite data stays valid; new optional fields appear when research completes again.
 
 There is no demo/mock mode: without Gemini configured, research steps will not produce real data.
 
