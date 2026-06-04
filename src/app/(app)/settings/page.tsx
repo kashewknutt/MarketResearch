@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GeminiFallback } from "@/components/gemini-fallback";
+import { RevenueGoalFields } from "@/components/revenue-goal-fields";
 import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
 import type { GeminiConnectionStatus } from "@/lib/ai/gemini";
 
@@ -136,45 +137,23 @@ function SettingsContent() {
             Reset to US + India
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs text-slate-500">Current MRR ($)</label>
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={profile.currentMrr}
-              onChange={(e) =>
-                setProfile({ ...profile, currentMrr: Number(e.target.value) })
-              }
-            />
-          </div>
-          <div>
-            <label className="text-xs text-slate-500">Goal revenue ($)</label>
-            <input
-              type="number"
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={profile.goalRevenue}
-              onChange={(e) =>
-                setProfile({ ...profile, goalRevenue: Number(e.target.value) })
-              }
-            />
-          </div>
-        </div>
-        <div>
-          <label className="text-xs text-slate-500">
-            Goal months (max 50): {profile.goalMonths}
-          </label>
-          <input
-            type="range"
-            min={1}
-            max={50}
-            value={profile.goalMonths}
-            onChange={(e) =>
-              setProfile({ ...profile, goalMonths: Number(e.target.value) })
-            }
-            className="mt-2 w-full"
-          />
-        </div>
+        <RevenueGoalFields
+          values={{
+            currency: profile.currency,
+            currentMrr: profile.currentMrr,
+            targetMrr: profile.targetMrr,
+            goalMonths: profile.goalMonths,
+          }}
+          onChange={(v) =>
+            setProfile({
+              ...profile,
+              currency: v.currency,
+              currentMrr: v.currentMrr,
+              targetMrr: v.targetMrr,
+              goalMonths: v.goalMonths,
+            })
+          }
+        />
       </section>
 
       <div className="flex flex-wrap gap-3">

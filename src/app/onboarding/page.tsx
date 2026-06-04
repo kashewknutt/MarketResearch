@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { RevenueGoalFields } from "@/components/revenue-goal-fields";
+import { DEFAULT_CURRENCY } from "@/lib/currency";
 import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
 
 const STEPS = ["Business", "Market", "Financials", "Goals"];
@@ -17,8 +19,9 @@ export default function OnboardingPage() {
     serviceDomain: "",
     targetAudience: "",
     regions: [...DEFAULT_REGIONS],
+    currency: DEFAULT_CURRENCY,
     currentMrr: 0,
-    goalRevenue: 0,
+    targetMrr: 0,
     goalMonths: 12,
     strategicGoals: "",
     constraints: "",
@@ -75,7 +78,7 @@ export default function OnboardingPage() {
       : step === 1
         ? form.targetAudience && form.regions.length > 0
         : step === 2
-          ? form.currentMrr >= 0 && form.goalRevenue > 0
+          ? form.currentMrr >= 0 && form.targetMrr > 0
           : form.goalMonths >= 1 && form.goalMonths <= 50;
 
   return (
@@ -137,23 +140,23 @@ export default function OnboardingPage() {
             </>
           )}
           {step === 2 && (
-            <>
-              <Field label="Current MRR ($)" value={String(form.currentMrr)} type="number" onChange={(v) => update("currentMrr", Number(v))} />
-              <Field label="Goal revenue ($)" value={String(form.goalRevenue)} type="number" onChange={(v) => update("goalRevenue", Number(v))} />
-              <div>
-                <label className="text-xs font-medium text-slate-500">
-                  Time horizon (months, max 50): {form.goalMonths}
-                </label>
-                <input
-                  type="range"
-                  min={1}
-                  max={50}
-                  value={form.goalMonths}
-                  onChange={(e) => update("goalMonths", Number(e.target.value))}
-                  className="mt-2 w-full"
-                />
-              </div>
-            </>
+            <RevenueGoalFields
+              values={{
+                currency: form.currency,
+                currentMrr: form.currentMrr,
+                targetMrr: form.targetMrr,
+                goalMonths: form.goalMonths,
+              }}
+              onChange={(v) =>
+                setForm((f) => ({
+                  ...f,
+                  currency: v.currency,
+                  currentMrr: v.currentMrr,
+                  targetMrr: v.targetMrr,
+                  goalMonths: v.goalMonths,
+                }))
+              }
+            />
           )}
           {step === 3 && (
             <>

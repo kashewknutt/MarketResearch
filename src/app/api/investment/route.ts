@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import { getProfile } from "@/lib/store/settings";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type { InvestmentSnapshot } from "@/lib/types/domain";
 
 export async function GET() {
   const investment = await getSnapshot<InvestmentSnapshot>("investment");
-  return NextResponse.json({ investment });
+  const profile = await getProfile();
+  return NextResponse.json({ investment, profile });
 }
 
 export async function PATCH(request: Request) {

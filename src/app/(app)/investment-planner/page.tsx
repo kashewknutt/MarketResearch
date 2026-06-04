@@ -3,15 +3,20 @@
 import { useEffect, useState } from "react";
 import { EditableField } from "@/components/editable-field";
 import { GeminiFallback } from "@/components/gemini-fallback";
-import type { InvestmentSnapshot } from "@/lib/types/domain";
+import { formatMoney } from "@/lib/currency";
+import type { InvestmentSnapshot, OnboardingProfile } from "@/lib/types/domain";
 
 export default function InvestmentPlannerPage() {
   const [investment, setInvestment] = useState<InvestmentSnapshot | null>(null);
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null);
 
   useEffect(() => {
     fetch("/api/investment")
       .then((r) => r.json())
-      .then((d) => setInvestment(d.investment));
+      .then((d) => {
+        setInvestment(d.investment);
+        setProfile(d.profile ?? null);
+      });
   }, []);
 
   const patchAllocation = async (
@@ -38,6 +43,7 @@ export default function InvestmentPlannerPage() {
     const res = await fetch("/api/investment");
     const d = await res.json();
     setInvestment(d.investment);
+    if (d.profile) setProfile(d.profile);
   };
 
   if (!investment) {
@@ -49,6 +55,8 @@ export default function InvestmentPlannerPage() {
     );
   }
 
+  const money = (n: number) => formatMoney(n, profile?.currency);
+
   return (
     <div className="space-y-8">
       <header>
@@ -57,7 +65,7 @@ export default function InvestmentPlannerPage() {
           Where to put money, why it matters, and expected outcomes.
         </p>
         <p className="mt-4 text-2xl font-semibold text-violet-700">
-          ${investment.totalRecommended.toLocaleString()} recommended
+          {money(investment.totalRecommended)} recommended
         </p>
       </header>
 
@@ -70,7 +78,7 @@ export default function InvestmentPlannerPage() {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="text-base font-semibold text-slate-800">{a.category}</h3>
               <span className="text-sm font-medium text-slate-600">
-                ${a.amount.toLocaleString()} ({a.percentage}%)
+                {money(a.amount)} ({a.percentage}%)
               </span>
             </div>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">

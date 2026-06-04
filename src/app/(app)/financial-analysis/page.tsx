@@ -3,15 +3,20 @@
 import { useEffect, useState } from "react";
 import { EditableField } from "@/components/editable-field";
 import { GeminiFallback } from "@/components/gemini-fallback";
-import type { FinancialSnapshot } from "@/lib/types/domain";
+import { formatMoney } from "@/lib/currency";
+import type { FinancialSnapshot, OnboardingProfile } from "@/lib/types/domain";
 
 export default function FinancialAnalysisPage() {
   const [financial, setFinancial] = useState<FinancialSnapshot | null>(null);
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null);
 
   const load = () =>
     fetch("/api/financial")
       .then((r) => r.json())
-      .then((d) => setFinancial(d.financial));
+      .then((d) => {
+        setFinancial(d.financial);
+        setProfile(d.profile ?? null);
+      });
 
   useEffect(() => {
     void load();
@@ -42,6 +47,7 @@ export default function FinancialAnalysisPage() {
   }
 
   const a = financial.assumptions;
+  const money = (n: number) => formatMoney(n, profile?.currency);
 
   return (
     <div className="space-y-8">
@@ -51,8 +57,14 @@ export default function FinancialAnalysisPage() {
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Gap to goal" value={`$${financial.gapToGoal.toLocaleString()}`} />
-        <StatCard label="Monthly pace needed" value={`$${financial.monthlyPaceRequired.toLocaleString()}`} />
+        <StatCard
+          label="Gap to target MRR"
+          value={money(financial.gapToGoal)}
+        />
+        <StatCard
+          label="Extra MRR per month needed"
+          value={money(financial.monthlyPaceRequired)}
+        />
         <StatCard label="Horizon" value={`${financial.projections.length} months`} />
       </div>
 
@@ -84,14 +96,16 @@ export default function FinancialAnalysisPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-sm font-semibold text-slate-700">Revenue projection</h2>
+        <h2 className="mb-4 text-sm font-semibold text-slate-700">
+          Monthly MRR projection ({profile?.currency ?? "USD"})
+        </h2>
         <div className="overflow-x-auto rounded-xl border border-slate-100">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-slate-500">
               <tr>
                 <th className="px-4 py-2">Month</th>
-                <th className="px-4 py-2">Revenue</th>
-                <th className="px-4 py-2">Cumulative</th>
+                <th className="px-4 py-2">MRR</th>
+                <th className="px-4 py-2">Cumulative MRR</th>
                 <th className="px-4 py-2">Investment</th>
               </tr>
             </thead>
@@ -99,9 +113,9 @@ export default function FinancialAnalysisPage() {
               {financial.projections.slice(0, 24).map((p) => (
                 <tr key={p.month} className="border-t border-slate-50">
                   <td className="px-4 py-2">{p.month}</td>
-                  <td className="px-4 py-2">${p.revenue.toLocaleString()}</td>
-                  <td className="px-4 py-2">${p.cumulativeRevenue.toLocaleString()}</td>
-                  <td className="px-4 py-2">${p.investment.toLocaleString()}</td>
+                  <td className="px-4 py-2">{money(p.revenue)}</td>
+                  <td className="px-4 py-2">{money(p.cumulativeRevenue)}</td>
+                  <td className="px-4 py-2">{money(p.investment)}</td>
                 </tr>
               ))}
             </tbody>
@@ -116,7 +130,7 @@ export default function FinancialAnalysisPage() {
             <div key={k} className="rounded-lg bg-rose-50/50 px-4 py-3 text-sm capitalize">
               <span className="text-slate-600">{k.replace(/([A-Z])/g, " $1")}</span>
               <span className="float-right font-medium text-slate-800">
-                ${v.toLocaleString()}
+                {money(v)}
               </span>
             </div>
           ))}

@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/currency";
 import type { OnboardingProfile, RegionCode } from "@/lib/types/domain";
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -9,8 +10,9 @@ Website: ${profile.website}
 Domain: ${profile.serviceDomain}
 Target audience: ${profile.targetAudience}
 Regions: ${profile.regions.join(", ")}
-MRR: $${profile.currentMrr}
-Goal revenue: $${profile.goalRevenue} in ${profile.goalMonths} months
+Currency: ${profile.currency}
+Current MRR: ${formatMoney(profile.currentMrr, profile.currency)}
+Target MRR (monthly, end of horizon): ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months
 Goals: ${profile.strategicGoals}
 Constraints: ${profile.constraints}
 
@@ -68,7 +70,7 @@ export function investmentPrompt(
   profile: OnboardingProfile,
   gapToGoal: number,
 ): string {
-  return `Investment allocation for ${profile.businessName}. Current MRR $${profile.currentMrr}, goal $${profile.goalRevenue} in ${profile.goalMonths} months. Revenue gap ~$${gapToGoal}.
+  return `Investment allocation for ${profile.businessName}. Current MRR ${formatMoney(profile.currentMrr, profile.currency)}, target MRR ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months. Monthly MRR gap ~${formatMoney(gapToGoal, profile.currency)}.
 
 Return JSON: {
   "totalRecommended": number,
@@ -78,7 +80,7 @@ Return JSON: {
 
 export function financialVariablesPrompt(profile: OnboardingProfile): string {
   return `Suggest financial projection variables for ${profile.serviceDomain} service business.
-MRR: $${profile.currentMrr}, goal: $${profile.goalRevenue}/${profile.goalMonths}mo.
+Currency: ${profile.currency}. Current MRR: ${formatMoney(profile.currentMrr, profile.currency)}. Target MRR: ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months.
 
 Return JSON: {
   "averageTicketUs": number,

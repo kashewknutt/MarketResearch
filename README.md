@@ -37,7 +37,7 @@ Data is stored in `./data` during development.
 ## Features
 
 - **System requirements** — Pre-flight checks for Gemini API, Google Search grounding, billing/quota, and local storage
-- **Onboarding** — Business profile, regions (default US + India), MRR, goal revenue (1–50 months)
+- **Onboarding** — Business profile, regions (default US + India), currency, current/target **monthly** MRR, and time horizon (1–50 months)
 - **Dashboard** — Top 10 demands per region, active projects with ticket sizes
 - **Projects** — 10 active projects per region; mark done → AI fetches 1 replacement
 - **Financial Analysis** — Projections, assumptions, investment breakdown (all editable)

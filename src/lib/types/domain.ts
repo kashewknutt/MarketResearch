@@ -26,8 +26,12 @@ export interface OnboardingProfile {
   serviceDomain: string;
   targetAudience: string;
   regions: RegionCode[];
+  /** ISO 4217 code for MRR and projection amounts (e.g. USD, EUR, INR). */
+  currency: string;
+  /** Monthly recurring revenue today. */
   currentMrr: number;
-  goalRevenue: number;
+  /** Target monthly recurring revenue at end of goalMonths (not annual/total/profit). */
+  targetMrr: number;
   goalMonths: number;
   strategicGoals: string;
   constraints: string;

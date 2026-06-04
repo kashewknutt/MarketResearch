@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/currency";
 import type {
   FinancialAssumptions,
   FinancialSnapshot,
@@ -9,7 +10,7 @@ import { createProvenance } from "@/lib/db/provenance";
 export function defaultAssumptions(profile: OnboardingProfile): FinancialAssumptions {
   const monthlyGrowth =
     profile.goalMonths > 0
-      ? (profile.goalRevenue - profile.currentMrr) / profile.goalMonths
+      ? (profile.targetMrr - profile.currentMrr) / profile.goalMonths
       : 0;
   return {
     averageTicketUs: 5000,
@@ -58,7 +59,7 @@ export function buildProjections(
       (m === assumptions.hiringMonth ? assumptions.hiringCost : 0);
     cumulative += revenue * 0.15;
     const pipelineNeeded =
-      (profile.goalRevenue - revenue) /
+      (profile.targetMrr - revenue) /
       Math.max(0.01, assumptions.closeRate * avgTicket);
 
     projections.push({
@@ -71,7 +72,7 @@ export function buildProjections(
   }
 
   const finalRevenue = projections[projections.length - 1]?.revenue ?? revenue;
-  const gapToGoal = profile.goalRevenue - finalRevenue;
+  const gapToGoal = profile.targetMrr - finalRevenue;
   const monthlyPaceRequired =
     profile.goalMonths > 0 ? gapToGoal / profile.goalMonths : gapToGoal;
 
@@ -112,7 +113,7 @@ export function buildProjections(
           ],
     narrative:
       narrative ||
-      `To reach $${profile.goalRevenue.toLocaleString()} in ${months} months from $${profile.currentMrr.toLocaleString()} MRR, focus on pipeline growth and conversion efficiency.`,
+      `To reach ${formatMoney(profile.targetMrr, profile.currency)} target MRR in ${months} months from ${formatMoney(profile.currentMrr, profile.currency)} current MRR, focus on pipeline growth and conversion efficiency.`,
     provenance: createProvenance("ai"),
   };
 }
