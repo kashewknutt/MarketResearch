@@ -1,7 +1,9 @@
 import { generateStructuredJson } from "@/lib/ai/gemini";
 import type { AiCallTrace } from "@/lib/ai/pricing-types";
 import { financialVariablesPrompt } from "@/lib/ai/prompts";
+import { financialMetricWorkbookAiSchema, safeParse } from "@/lib/agents/validate";
 import { createProvenance } from "@/lib/db/provenance";
+import { newId } from "@/lib/id";
 import {
   applyLinkedInAdsToLineItems,
   fetchLinkedInAdHistory,
@@ -11,18 +13,16 @@ import {
   defaultExpenseLineItemsForDomain,
   migrateAssumptionsToLineItems,
 } from "@/lib/research/expense-line-items";
+import { normalizeMetricWorkbook } from "@/lib/research/financial-pl-engine";
 import {
   buildProjections,
   defaultAssumptions,
 } from "@/lib/research/projection-engine";
-import { normalizeMonthlyPlans } from "@/lib/research/financial-timeline-engine";
 import type {
   ExpenseLineItem,
   FinancialAssumptions,
-  FinancialIncomeDrivers,
-  FinancialMonthlyPlans,
+  FinancialMetricWorkbook,
   FinancialSnapshot,
-  MonthlyIncomeRow,
   OnboardingProfile,
 } from "@/lib/types/domain";
 
@@ -30,15 +30,31 @@ type RawFinancial = Partial<FinancialAssumptions> & {
   narrative: string;
   leverageVariables: string[];
   expenseLineItems?: ExpenseLineItem[];
-  incomeDrivers?: {
-    conservative?: FinancialIncomeDrivers;
-    ambitious?: FinancialIncomeDrivers;
-  };
-  monthlyPlans?: {
-    conservative?: MonthlyIncomeRow[];
-    ambitious?: MonthlyIncomeRow[];
-  };
+  metrics?: FinancialMetricWorkbook["metrics"];
+  conservative?: Record<string, number[]>;
+  ambitious?: Record<string, number[]>;
+  monthlyChurnRate?: number;
 };
+
+function workbookFromAi(
+  profile: OnboardingProfile,
+  raw: RawFinancial,
+): FinancialMetricWorkbook {
+  const parsed = safeParse(financialMetricWorkbookAiSchema, raw);
+  const metrics = (parsed?.metrics ?? raw.metrics ?? []).map((m, i) => ({
+    ...m,
+    id: m.id || newId(),
+    order: m.order ?? (i + 1) * 10,
+  }));
+
+  return normalizeMetricWorkbook(profile, {
+    metrics,
+    conservative: parsed?.conservative ?? raw.conservative,
+    ambitious: parsed?.ambitious ?? raw.ambitious,
+    activeScenario: "ambitious",
+    monthlyChurnRate: parsed?.monthlyChurnRate ?? raw.monthlyChurnRate,
+  });
+}
 
 export async function runFinancialModeling(
   profile: OnboardingProfile,
@@ -56,16 +72,14 @@ export async function runFinancialModeling(
 
   const result = await generateStructuredJson<RawFinancial>({
     task: "financial_variables",
-    systemInstruction: `Financial analyst for ${profile.serviceDomain} service businesses. Estimate realistic monthly costs per line item in ${profile.currency}. JSON only.`,
+    systemInstruction: `Financial analyst for ${profile.serviceDomain}. Build a full P&L metric grid with monthly values per row. Currency: ${profile.currency}. JSON only.`,
     userPrompt: `${financialVariablesPrompt(profile)}
 
-Use these expense line item names for ${profile.serviceDomain} (estimate monthlyAmount for each in ${profile.currency}):
+Optional expenseLineItems baseline names:
 ${templateItems.map((i) => `- ${i.name} (${i.category})`).join("\n")}
 
 LinkedIn ad intelligence:
-${linkedInAdHistory.available ? `Available. Last months: ${linkedInAdHistory.monthlySpend.map((m) => `${m.month}: ${m.amount}`).join(", ")}. ${linkedInAdHistory.message}` : linkedInAdHistory.message}
-
-Return expenseLineItems array with id, name, category, monthlyAmount, optional headcount, unitCost, notes.`,
+${linkedInAdHistory.available ? `Available. Last months: ${linkedInAdHistory.monthlySpend.map((m) => `${m.month}: ${m.amount}`).join(", ")}.` : linkedInAdHistory.message}`,
     useGoogleSearch: true,
     parse: (raw) => raw as RawFinancial,
     trace,
@@ -86,24 +100,14 @@ Return expenseLineItems array with id, name, category, monthlyAmount, optional h
   );
   merged = migrateAssumptionsToLineItems(merged, profile, defaults);
 
-  const monthlyPlans = normalizeMonthlyPlans(profile, merged, {
-    conservative: result.data.monthlyPlans?.conservative,
-    ambitious: result.data.monthlyPlans?.ambitious,
-    incomeDrivers: result.data.incomeDrivers
-      ? {
-          conservative: result.data.incomeDrivers.conservative!,
-          ambitious: result.data.incomeDrivers.ambitious!,
-        }
-      : undefined,
-    activeScenario: "ambitious",
-  } as Partial<FinancialMonthlyPlans>);
+  const metricWorkbook = workbookFromAi(profile, result.data);
 
   const snapshot = buildProjections(
     profile,
     merged,
     narrative,
     leverageVariables,
-    monthlyPlans,
+    metricWorkbook,
   );
   snapshot.linkedInAdHistory = linkedInAdHistory;
   snapshot.provenance = createProvenance("search", result.citations, 0.85);

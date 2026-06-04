@@ -34,12 +34,16 @@ export async function GET() {
         financial.assumptions.value,
         financial.narrative,
         financial.leverageVariables,
+        financial.metricWorkbook,
         financial.monthlyPlans,
       )
     : buildProjections(profile, defaultAssumptions(profile));
 
   const projections = built.projections;
-  const scenarioLabel = built.monthlyPlans?.activeScenario ?? "ambitious";
+  const scenarioLabel =
+    built.metricWorkbook?.activeScenario ??
+    built.monthlyPlans?.activeScenario ??
+    "ambitious";
 
   const metrics: DashboardMetrics = {
     currentMrr: profile.currentMrr,

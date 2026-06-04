@@ -2,25 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
-import { ExpenseLineItemsEditor } from "@/components/expense-line-items-editor";
+import { FinancialMetricGrid } from "@/components/financial-metric-grid";
 import {
+  FinancialInflowOutflowChart,
   FinancialMrrChart,
-  FinancialProfitChart,
 } from "@/components/financial-projection-chart";
-import { MonthlyExpenseTable } from "@/components/monthly-expense-table";
-import { MonthlyIncomeTable } from "@/components/monthly-income-table";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { MetricCard } from "@/components/ui/metric-card";
 import { formatMoney } from "@/lib/currency";
-import {
-  buildDefaultExpenseTable,
-  computeBothScenarios,
-} from "@/lib/research/financial-timeline-engine";
+import { computePlBothScenarios } from "@/lib/research/financial-pl-engine";
 import { buildProjections } from "@/lib/research/projection-engine";
-import { syncLegacySpendFields } from "@/lib/research/expense-line-items";
 import type {
   FinancialAssumptions,
-  FinancialMonthlyPlans,
+  FinancialMetricWorkbook,
   FinancialScenario,
   FinancialSnapshot,
   OnboardingProfile,
@@ -30,8 +24,10 @@ export default function FinancialAnalysisPage() {
   const [stored, setStored] = useState<FinancialSnapshot | null>(null);
   const [profile, setProfile] = useState<OnboardingProfile | null>(null);
   const [assumptions, setAssumptions] = useState<FinancialAssumptions | null>(null);
-  const [monthlyPlans, setMonthlyPlans] = useState<FinancialMonthlyPlans | null>(null);
-  const [incomeTab, setIncomeTab] = useState<FinancialScenario>("ambitious");
+  const [metricWorkbook, setMetricWorkbook] = useState<FinancialMetricWorkbook | null>(
+    null,
+  );
+  const [editTab, setEditTab] = useState<FinancialScenario>("ambitious");
 
   const loadFinancial = useCallback(() => {
     fetch("/api/financial")
@@ -42,20 +38,9 @@ export default function FinancialAnalysisPage() {
         if (d.financial?.assumptions?.value) {
           setAssumptions(d.financial.assumptions.value);
         }
-        if (d.financial?.monthlyPlans) {
-          setMonthlyPlans(d.financial.monthlyPlans);
-          setIncomeTab(d.financial.monthlyPlans.activeScenario);
-        } else if (d.financial?.assumptions?.value && d.profile) {
-          const seeded = buildProjections(
-            d.profile,
-            d.financial.assumptions.value,
-            d.financial.narrative,
-            d.financial.leverageVariables,
-          ).monthlyPlans;
-          if (seeded) {
-            setMonthlyPlans(seeded);
-            setIncomeTab(seeded.activeScenario);
-          }
+        if (d.financial?.metricWorkbook) {
+          setMetricWorkbook(d.financial.metricWorkbook);
+          setEditTab(d.financial.metricWorkbook.activeScenario);
         }
       });
   }, []);
@@ -73,82 +58,43 @@ export default function FinancialAnalysisPage() {
       assumptions,
       stored?.narrative,
       stored?.leverageVariables,
-      monthlyPlans ?? undefined,
+      metricWorkbook ?? undefined,
+      stored?.monthlyPlans,
     );
-  }, [profile, assumptions, stored, monthlyPlans]);
+  }, [profile, assumptions, stored, metricWorkbook]);
 
   const scenarioEnds = useMemo(() => {
-    if (!profile || !assumptions || !financial?.monthlyPlans) return null;
-    const { conservative, ambitious } = computeBothScenarios(
+    if (!profile || !financial?.metricWorkbook) return null;
+    const { conservative, ambitious } = computePlBothScenarios(
       profile,
-      assumptions,
-      financial.monthlyPlans,
+      financial.metricWorkbook,
     );
-    return {
-      conservative: conservative.finalMrr,
-      ambitious: ambitious.finalMrr,
-    };
-  }, [profile, assumptions, financial?.monthlyPlans]);
+    return { conservative: conservative.finalMrr, ambitious: ambitious.finalMrr };
+  }, [profile, financial?.metricWorkbook]);
 
-  const updateExpenseItems = useCallback(
-    (items: FinancialAssumptions["expenseLineItems"]) => {
-      setAssumptions((prev) => {
-        if (!prev) return prev;
-        const next = syncLegacySpendFields({ ...prev, expenseLineItems: items });
-        if (profile) {
-          setMonthlyPlans((plans) =>
-            plans
-              ? {
-                  ...plans,
-                  expenses: buildDefaultExpenseTable(profile, items),
-                }
-              : plans,
-          );
-        }
-        return next;
-      });
-    },
-    [profile],
-  );
-
-  const updatePlans = useCallback((patch: Partial<FinancialMonthlyPlans>) => {
-    setMonthlyPlans((prev) => (prev ? { ...prev, ...patch } : prev));
+  const updateWorkbook = useCallback((wb: FinancialMetricWorkbook) => {
+    setMetricWorkbook(wb);
   }, []);
 
   const setActiveScenario = (scenario: FinancialScenario) => {
-    setIncomeTab(scenario);
-    updatePlans({ activeScenario: scenario });
-  };
-
-  const resetExpenseMonth = (month: number) => {
-    if (!profile || !assumptions || !monthlyPlans) return;
-    const computed = buildDefaultExpenseTable(
-      profile,
-      assumptions.expenseLineItems ?? [],
-    );
-    const row = computed.find((r) => r.month === month);
-    if (!row) return;
-    updatePlans({
-      expenses: monthlyPlans.expenses.map((r) =>
-        r.month === month ? { ...row, userEdited: false } : r,
-      ),
-    });
+    if (!metricWorkbook) return;
+    setMetricWorkbook({ ...metricWorkbook, activeScenario: scenario });
   };
 
   const persist = async () => {
-    if (!assumptions || !monthlyPlans) return;
+    if (!assumptions || !metricWorkbook) return;
     await fetch("/api/financial", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assumptions, monthlyPlans }),
+      body: JSON.stringify({ assumptions, metricWorkbook }),
     });
     const res = await fetch("/api/financial");
     const d = await res.json();
     setStored(d.financial);
-    if (d.financial?.monthlyPlans) setMonthlyPlans(d.financial.monthlyPlans);
+    if (d.financial?.metricWorkbook) setMetricWorkbook(d.financial.metricWorkbook);
   };
 
-  if (!financial || !profile || !assumptions || !financial.monthlyPlans) {
+  if (!financial || !profile || !financial.metricWorkbook) {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">Financial Analysis</h1>
@@ -159,18 +105,17 @@ export default function FinancialAnalysisPage() {
 
   const currency = profile.currency;
   const money = (n: number) => formatMoney(n, currency);
-  const plans = monthlyPlans ?? financial.monthlyPlans!;
-  const displayAssumptions = assumptions;
-
-  const avgProfit =
-    financial.projections.reduce(
-      (s, p) =>
-        s +
-        (p.netCash ??
-          p.netMrr ??
-          (p.cashCollected ?? 0) - (p.expenses ?? p.investment)),
-      0,
-    ) / Math.max(1, financial.projections.length);
+  const wb = metricWorkbook ?? financial.metricWorkbook!;
+  const months = financial.projections.length;
+  const last = financial.projections[financial.projections.length - 1];
+  const lastSummary = last
+    ? {
+        revenue: last.totalRevenue ?? last.cashCollected ?? 0,
+        expenses: last.totalExpenses ?? last.expenses,
+        profit: last.netCash ?? last.netMrr ?? 0,
+        margin: last.profitMarginPct ?? 0,
+      }
+    : null;
 
   return (
     <div className="space-y-8">
@@ -178,35 +123,30 @@ export default function FinancialAnalysisPage() {
         <h1 className="text-2xl font-semibold text-slate-800">Financial Analysis</h1>
         <p className="mt-1 text-sm text-slate-500">{financial.narrative}</p>
         <p className="mt-2 text-xs text-slate-500">
-          Edit monthly expense and income tables (Conservative vs Ambitious). MRR builds from
-          recurring low-ticket adds each month; high-ticket (~3/year) and whale deals add lumpy
-          cash. Charts use the active scenario below.
+          Domain-specific P&L: edit revenue and expense metrics per month (Conservative vs
+          Ambitious). Total Revenue, EBITDA, Net Profit, and margin are computed automatically.
         </p>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          label="End MRR (active)"
-          value={money(
-            financial.projections[financial.projections.length - 1]?.recurringMrr ??
-              financial.projections[financial.projections.length - 1]?.revenue ??
-              0,
-          )}
+          label="End inflow (active)"
+          value={money(lastSummary?.revenue ?? 0)}
           currency={currency}
         />
         <MetricCard
-          label="Target MRR"
-          value={money(profile.targetMrr)}
+          label="End outflow (active)"
+          value={money(lastSummary?.expenses ?? 0)}
           currency={currency}
         />
         <MetricCard
-          label="Gap to target"
-          value={money(financial.gapToGoal)}
+          label="End net profit"
+          value={money(lastSummary?.profit ?? 0)}
           currency={currency}
         />
         <MetricCard
-          label="Avg monthly profit"
-          value={money(Math.round(avgProfit))}
+          label="End MRR"
+          value={money(last?.recurringMrr ?? last?.revenue ?? 0)}
           currency={currency}
         />
       </div>
@@ -214,63 +154,21 @@ export default function FinancialAnalysisPage() {
       {scenarioEnds && (
         <p className="text-xs text-slate-600">
           End MRR — Conservative: {money(scenarioEnds.conservative)} · Ambitious:{" "}
-          {money(scenarioEnds.ambitious)}
+          {money(scenarioEnds.ambitious)} · Target: {money(profile.targetMrr)}
         </p>
       )}
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-700">
-          Step 1 — Expense line items
-        </h2>
-        <ExpenseLineItemsEditor
-          items={displayAssumptions.expenseLineItems ?? []}
-          currency={currency}
-          onChange={updateExpenseItems}
-        />
-      </section>
-
-      <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-700">
-            Step 2 — Monthly expenses ({currency})
-          </h2>
-          <button
-            type="button"
-            onClick={() => {
-              if (!profile) return;
-              updatePlans({
-                expenses: buildDefaultExpenseTable(
-                  profile,
-                  displayAssumptions.expenseLineItems ?? [],
-                ),
-              });
-            }}
-            className="text-xs text-violet-600 hover:underline"
-          >
-            Reset all from line items
-          </button>
-        </div>
-        <MonthlyExpenseTable
-          rows={plans.expenses}
-          currency={currency}
-          onChange={(expenses) => updatePlans({ expenses })}
-          onResetMonth={resetExpenseMonth}
-        />
-      </section>
-
-      <section>
         <div className="mb-3 flex flex-wrap items-center gap-3">
-          <h2 className="text-sm font-semibold text-slate-700">
-            Step 3 — Monthly income ({currency})
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-700">P&L metric grid</h2>
           <div className="flex rounded-lg border border-slate-200 p-0.5 text-xs">
             {(["conservative", "ambitious"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
-                onClick={() => setIncomeTab(s)}
+                onClick={() => setEditTab(s)}
                 className={`rounded-md px-3 py-1 capitalize ${
-                  incomeTab === s
+                  editTab === s
                     ? "bg-violet-500 text-white"
                     : "text-slate-600 hover:bg-slate-50"
                 }`}
@@ -280,43 +178,39 @@ export default function FinancialAnalysisPage() {
             ))}
           </div>
         </div>
-        <MonthlyIncomeTable
-          rows={incomeTab === "conservative" ? plans.conservative : plans.ambitious}
+        <FinancialMetricGrid
+          workbook={wb}
+          editScenario={editTab}
           currency={currency}
-          onChange={(rows) =>
-            updatePlans(
-              incomeTab === "conservative"
-                ? { conservative: rows }
-                : { ambitious: rows },
-            )
-          }
+          months={months}
+          onChange={updateWorkbook}
         />
       </section>
 
       <section>
         <h2 className="mb-3 text-sm font-semibold text-slate-700">
-          Step 4 — Scenario for charts
+          Charts use active scenario
         </h2>
-        <div className="flex flex-wrap gap-4 text-sm">
+        <div className="mb-3 flex flex-wrap gap-4 text-sm">
           {(["conservative", "ambitious"] as const).map((s) => (
             <label key={s} className="flex items-center gap-2 capitalize">
               <input
                 type="radio"
                 name="activeScenario"
-                checked={plans.activeScenario === s}
+                checked={wb.activeScenario === s}
                 onChange={() => setActiveScenario(s)}
               />
               {s}
             </label>
           ))}
+          <button
+            type="button"
+            onClick={() => void persist()}
+            className="ml-auto rounded-lg bg-violet-500 px-4 py-1.5 text-xs text-white hover:bg-violet-600"
+          >
+            Save to database
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void persist()}
-          className="mt-4 rounded-lg bg-violet-500 px-4 py-2 text-sm text-white hover:bg-violet-600"
-        >
-          Save to database
-        </button>
       </section>
 
       {financial.linkedInAdHistory && (
@@ -329,55 +223,21 @@ export default function FinancialAnalysisPage() {
       <section className="grid gap-6 lg:grid-cols-2">
         <div>
           <h2 className="mb-3 text-sm font-semibold text-slate-700">
-            MRR timeline ({plans.activeScenario})
+            Inflow vs outflow ({wb.activeScenario})
           </h2>
+          <FinancialInflowOutflowChart
+            projections={financial.projections}
+            currency={currency}
+          />
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">MRR timeline</h2>
           <FinancialMrrChart
             projections={financial.projections}
             currency={currency}
             targetMrr={profile.targetMrr}
-            scenarioLabel={`Active: ${plans.activeScenario}`}
+            scenarioLabel={`Active: ${wb.activeScenario}`}
           />
-        </div>
-        <div>
-          <h2 className="mb-3 text-sm font-semibold text-slate-700">Monthly profit</h2>
-          <FinancialProfitChart
-            projections={financial.projections}
-            currency={currency}
-          />
-        </div>
-      </section>
-
-      <section>
-        <h2 className="mb-4 text-sm font-semibold text-slate-700">Monthly detail</h2>
-        <div className="overflow-x-auto rounded-xl border border-slate-100">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="px-4 py-2">Month</th>
-                <th className="px-4 py-2">Cash in</th>
-                <th className="px-4 py-2">MRR</th>
-                <th className="px-4 py-2">Expenses</th>
-                <th className="px-4 py-2">Profit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {financial.projections.map((p) => (
-                <tr key={p.month} className="border-t border-slate-50">
-                  <td className="px-4 py-2">{p.month}</td>
-                  <td className="px-4 py-2">{money(p.cashCollected ?? 0)}</td>
-                  <td className="px-4 py-2">{money(p.recurringMrr ?? p.revenue)}</td>
-                  <td className="px-4 py-2">{money(p.expenses ?? p.investment)}</td>
-                  <td className="px-4 py-2">
-                    {money(
-                      p.netCash ??
-                        p.netMrr ??
-                        (p.cashCollected ?? 0) - (p.expenses ?? p.investment),
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </section>
     </div>

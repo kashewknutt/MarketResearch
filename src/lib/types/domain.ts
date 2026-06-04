@@ -212,6 +212,41 @@ export interface FinancialMonthlyPlans {
   };
 }
 
+export type FinancialMetricKind = "revenue" | "expense";
+
+export interface FinancialMetricDefinition {
+  id: string;
+  label: string;
+  kind: FinancialMetricKind;
+  group?: string;
+  /** Contributes to recurring MRR roll-forward when true. */
+  recurring?: boolean;
+  order: number;
+  notes?: string;
+  userDefined?: boolean;
+}
+
+/** metricId -> values per month (index 0 = month 1). */
+export type FinancialScenarioValues = Record<string, number[]>;
+
+export interface FinancialMetricWorkbook {
+  metrics: FinancialMetricDefinition[];
+  conservative: FinancialScenarioValues;
+  ambitious: FinancialScenarioValues;
+  activeScenario: FinancialScenario;
+  monthlyChurnRate?: number;
+}
+
+export interface MonthlyPlSummary {
+  month: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  ebitda: number;
+  netProfit: number;
+  profitMarginPct: number;
+  recurringMrr?: number;
+}
+
 export interface MonthlyDealBreakdown {
   lowTicket: number;
   midTicket: number;
@@ -239,6 +274,11 @@ export interface MonthlyProjection {
   netCash?: number;
   /** @deprecated Prefer netCash */
   netMrr: number;
+  totalRevenue?: number;
+  totalExpenses?: number;
+  ebitda?: number;
+  profitMarginPct?: number;
+  plSummaries?: MonthlyPlSummary[];
   newContracts?: MonthlyDealBreakdown;
   expenseByCategory?: Partial<Record<ExpenseCategory, number>>;
   expenseByLineItem?: Record<string, number>;
@@ -246,7 +286,9 @@ export interface MonthlyProjection {
 
 export interface FinancialSnapshot {
   assumptions: EditableValue<FinancialAssumptions>;
+  /** @deprecated Use metricWorkbook */
   monthlyPlans?: FinancialMonthlyPlans;
+  metricWorkbook?: FinancialMetricWorkbook;
   linkedInAdHistory?: LinkedInAdHistory;
   projections: MonthlyProjection[];
   scenarios: {

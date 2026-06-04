@@ -5,6 +5,7 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
+  Legend,
   Line,
   ReferenceLine,
   ResponsiveContainer,
@@ -80,6 +81,59 @@ export function FinancialMrrChart({
   );
 }
 
+export function FinancialInflowOutflowChart({
+  projections,
+  currency,
+}: {
+  projections: MonthlyProjection[];
+  currency: string;
+}) {
+  const ready = useChartReady(projections.length);
+  const data = projections.map((p) => ({
+    month: `M${p.month}`,
+    inflow: p.totalRevenue ?? p.cashCollected ?? p.revenue,
+    outflow: p.totalExpenses ?? p.expenses ?? p.investment,
+    netProfit:
+      p.netCash ??
+      p.netMrr ??
+      (p.totalRevenue ?? p.cashCollected ?? 0) -
+        (p.totalExpenses ?? p.expenses ?? p.investment),
+  }));
+  const fmt = (v: number) => formatMoney(v, currency);
+
+  if (!ready) {
+    return (
+      <div className="flex h-64 min-h-[256px] min-w-0 items-center justify-center rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-400">
+        Loading chart…
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-64 min-h-[256px] min-w-0 w-full rounded-xl border border-slate-100 bg-white p-4">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(Number(v))} />
+          <Tooltip formatter={(value) => fmt(Number(value ?? 0))} />
+          <Legend />
+          <Bar dataKey="inflow" name="Inflow (revenue)" fill="#86efac" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="outflow" name="Outflow (expenses)" fill="#fda4af" radius={[2, 2, 0, 0]} />
+          <Line
+            type="monotone"
+            dataKey="netProfit"
+            name="Net profit"
+            stroke="#0ea5e9"
+            strokeWidth={2}
+            dot={false}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 export function FinancialProfitChart({
   projections,
   currency,
@@ -133,8 +187,8 @@ export function FinancialProjectionChart({
 }) {
   return (
     <div className="space-y-4">
+      <FinancialInflowOutflowChart projections={projections} currency={currency} />
       <FinancialMrrChart projections={projections} currency={currency} />
-      <FinancialProfitChart projections={projections} currency={currency} />
     </div>
   );
 }

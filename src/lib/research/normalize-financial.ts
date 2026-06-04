@@ -2,7 +2,7 @@ import { buildProjections } from "@/lib/research/projection-engine";
 import { migrateAssumptionsToLineItems } from "@/lib/research/expense-line-items";
 import type { FinancialSnapshot, OnboardingProfile } from "@/lib/types/domain";
 
-/** Ensure stored snapshots have expense line items and fresh projections. */
+/** Ensure stored snapshots have metric workbook and fresh projections. */
 export function normalizeFinancialSnapshot(
   snapshot: FinancialSnapshot,
   profile: OnboardingProfile,
@@ -18,12 +18,13 @@ export function normalizeFinancialSnapshot(
     migrated,
     snapshot.narrative,
     snapshot.leverageVariables,
+    snapshot.metricWorkbook,
     snapshot.monthlyPlans,
   );
   return {
     ...rebuilt,
     linkedInAdHistory: snapshot.linkedInAdHistory ?? rebuilt.linkedInAdHistory,
-    monthlyPlans: rebuilt.monthlyPlans,
+    metricWorkbook: rebuilt.metricWorkbook,
     assumptions: {
       ...snapshot.assumptions,
       value: migrated,

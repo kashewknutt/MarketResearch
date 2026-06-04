@@ -82,24 +82,31 @@ Return JSON: {
 }
 
 export function financialVariablesPrompt(profile: OnboardingProfile): string {
-  return `Suggest financial projection variables for ${profile.serviceDomain} service business.
-Currency: ${profile.currency}. Current MRR: ${formatMoney(profile.currentMrr, profile.currency)}. Target MRR: ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months.
+  const months = profile.goalMonths;
+  return `Build a domain-specific P&L metric workbook for ${profile.serviceDomain} (${profile.businessName}).
+Currency: ${profile.currency}. Current MRR: ${formatMoney(profile.currentMrr, profile.currency)}. Target MRR: ${formatMoney(profile.targetMrr, profile.currency)} over ${months} months.
 
-Estimate realistic monthly amounts for domain-specific expense line items (people, tools, marketing, operations). Examples for software: developers, designers, marketing staff, AI tools, LinkedIn ads, cloud hosting.
+Step 1 — Define metrics[] for THIS domain (software agency example):
+Revenue rows: "Revenue from Small Clients" (recurring:true), "Revenue from Enterprise", "Huge Client 1 Revenue", "Huge Client 2 Revenue"
+Expense rows: Developer Salaries, Founder Draws, Developer AI Tools, AI Tool Costs, SaaS Subscriptions, Cloud Hosting, Office/Admin, Marketing Spend, Video Production, Graphic Design, Travel & Sales, Miscellaneous
+
+Adapt labels to ${profile.serviceDomain} — same structure: recurring small revenue + lumpy enterprise/whale rows + detailed expense lines.
+
+Step 2 — For EACH metric id, provide monthly amounts arrays of length ${months} (index 0 = month 1) in conservative and ambitious objects keyed by metric id.
+
+Rules:
+- All amounts in ${profile.currency} only.
+- Small/recurring revenue steady month-to-month; enterprise ~3 spikes per year; huge clients 0-2 large months in ambitious.
+- Marketing Spend should often scale ~8-12% of that month's total revenue.
+- Conservative: lower revenue, fewer whale months; ambitious: path toward target MRR on recurring row by month ${months}.
 
 Return JSON: {
-  "expenseLineItems": [{ "id": string, "name": string, "category": "people"|"tools"|"marketing"|"operations"|"other", "monthlyAmount": number, "headcount": number?, "unitCost": number?, "notes": string? }],
-  "incomeDrivers": {
-    "conservative": { "lowTicketClientsPerMonth": number, "lowTicketMrrEach": number, "highTicketsPerYear": 3, "highTicketAmount": number, "whalesPerYear": number, "whaleAmount": number, "monthlyChurnRate": number },
-    "ambitious": { same shape — higher clients and ticket sizes toward target MRR }
-  },
-  "monthlyPlans": {
-    "conservative": [{ "month": number (1..${profile.goalMonths}), "lowTicketClients": number, "lowTicketMrr": number, "highTicketCash": number (0 most months), "whaleCash": number (0 most months) }],
-    "ambitious": [ same for each month — ~3 high-ticket months per year, rare whale months ]
-  },
+  "metrics": [{ "id": string (stable slug), "label": string, "kind": "revenue"|"expense", "group": string, "recurring": boolean?, "order": number }],
+  "conservative": { "<metricId>": [number x${months}], ... },
+  "ambitious": { "<metricId>": [number x${months}], ... },
+  "monthlyChurnRate": number (0-0.2),
+  "expenseLineItems": [{ "id": string, "name": string, "category": "people"|"tools"|"marketing"|"operations"|"other", "monthlyAmount": number }],
   "narrative": string,
   "leverageVariables": string[]
-}
-
-All amounts in ${profile.currency}. Conservative path should end near 50-60% of MRR gap; ambitious near 90-100% of target MRR by month ${profile.goalMonths}.`;
+}`;
 }

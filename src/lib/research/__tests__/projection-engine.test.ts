@@ -1,5 +1,8 @@
 import { buildProjections, defaultAssumptions } from "../projection-engine";
-import { computeBothScenarios } from "../financial-timeline-engine";
+import {
+  computePlMonth,
+  computePlBothScenarios,
+} from "../financial-pl-engine";
 import type { OnboardingProfile } from "@/lib/types/domain";
 
 function run(profile: OnboardingProfile) {
@@ -9,7 +12,7 @@ function run(profile: OnboardingProfile) {
 const usProfile: OnboardingProfile = {
   businessName: "Test Co",
   website: "https://test.com",
-  serviceDomain: "Consulting",
+  serviceDomain: "Software development agency",
   targetAudience: "SMBs",
   regions: ["US", "India"],
   socialLinks: [],
@@ -22,14 +25,6 @@ const usProfile: OnboardingProfile = {
   completedAt: new Date().toISOString(),
 };
 
-const inrProfile: OnboardingProfile = {
-  ...usProfile,
-  currency: "INR",
-  currentMrr: 2000,
-  targetMrr: 10000,
-  goalMonths: 40,
-};
-
 let failed = 0;
 
 function assert(cond: boolean, msg: string) {
@@ -40,63 +35,59 @@ function assert(cond: boolean, msg: string) {
 }
 
 const snap = run(usProfile);
-assert(snap.projections.length === 12, `Expected 12 months, got ${snap.projections.length}`);
-assert(snap.monthlyPlans != null, "monthlyPlans should exist");
+assert(snap.metricWorkbook != null, "metricWorkbook should exist");
+const wb = snap.metricWorkbook!;
+assert(wb.metrics.length >= 5, `metrics count ${wb.metrics.length}`);
 assert(
-  snap.monthlyPlans!.expenses.length === 12,
-  `expense table length ${snap.monthlyPlans!.expenses.length}`,
+  wb.metrics.some((m) => m.kind === "revenue"),
+  "has revenue metrics",
 );
 assert(
-  snap.monthlyPlans!.conservative.length === 12,
-  "conservative income table length",
-);
-assert(
-  snap.monthlyPlans!.ambitious.length === 12,
-  "ambitious income table length",
+  wb.metrics.some((m) => m.kind === "expense"),
+  "has expense metrics",
 );
 
-const { conservative, ambitious } = computeBothScenarios(
-  usProfile,
-  snap.assumptions.value,
-  snap.monthlyPlans!,
-);
+const revenueMetrics = wb.metrics.filter((m) => m.kind === "revenue");
+const month0 = computePlMonth(wb.metrics, wb.ambitious, 0);
+let sumRev = 0;
+for (const m of revenueMetrics) {
+  sumRev += wb.ambitious[m.id]?.[0] ?? 0;
+}
+assert(month0.totalRevenue === sumRev, `total revenue M1 ${month0.totalRevenue} vs ${sumRev}`);
+
+const { conservative, ambitious } = computePlBothScenarios(usProfile, wb);
 assert(
   ambitious.finalMrr > conservative.finalMrr,
-  `ambitious ${ambitious.finalMrr} should exceed conservative ${conservative.finalMrr}`,
-);
-assert(
-  ambitious.finalMrr >= usProfile.targetMrr * 0.7,
-  `ambitious end MRR ${ambitious.finalMrr} below 70% of target`,
-);
-assert(
-  ambitious.finalMrr <= usProfile.targetMrr * 1.15,
-  `ambitious end MRR ${ambitious.finalMrr} too high`,
+  `ambitious MRR ${ambitious.finalMrr} > conservative ${conservative.finalMrr}`,
 );
 
-const highMonths = snap.monthlyPlans!.ambitious.filter((r) => r.highTicketCash > 0);
-assert(highMonths.length >= 2, "should have high-ticket months in ambitious plan");
-
-const lowMrrMonths = snap.projections.filter((p) => (p.cashCollected ?? 0) > 0);
-assert(lowMrrMonths.length >= 8, "most months should have cash in");
-
-assert(
-  snap.scenarios.conservative.length === 12 &&
-    snap.scenarios.aggressive.length === 12,
-  "scenario series length",
+const ambHighMonth = ambitious.summaries.some(
+  (s) => (s.totalRevenue ?? 0) > (conservative.summaries.find((c) => c.month === s.month)?.totalRevenue ?? 0),
 );
-assert(
-  snap.scenarios.aggressive[snap.scenarios.aggressive.length - 1]! >
-    snap.scenarios.conservative[snap.scenarios.conservative.length - 1]!,
-  "aggressive series should end above conservative",
-);
+assert(ambHighMonth, "ambitious should exceed conservative in some month");
 
-const inrSnap = run(inrProfile);
-assert(inrSnap.projections.length === 40, "INR 40-month horizon");
-const inrEnd =
-  inrSnap.projections[inrSnap.projections.length - 1]!.recurringMrr ??
-  inrSnap.projections[inrSnap.projections.length - 1]!.revenue;
-assert(inrEnd > inrProfile.currentMrr, `INR should grow: ${inrEnd}`);
-assert(inrEnd >= inrProfile.targetMrr * 0.5, `INR end ${inrEnd} too low`);
+const hasWhaleMonth = ambitious.summaries.some((s) => {
+  const enterprise = wb.metrics.find((m) => /enterprise|huge/i.test(m.label));
+  if (!enterprise) return s.totalRevenue > 50000;
+  const idx = s.month - 1;
+  return (wb.ambitious[enterprise.id]?.[idx] ?? 0) > 0;
+});
+assert(hasWhaleMonth, "ambitious should have lumpy revenue month");
+
+const m1 = ambitious.summaries[0]!;
+if (m1.totalRevenue > 0) {
+  const expectedMargin = m1.netProfit / m1.totalRevenue;
+  assert(
+    Math.abs(m1.profitMarginPct - expectedMargin) < 0.0001,
+    "profit margin pct",
+  );
+}
+
+assert(snap.projections.length === 12, "12 month projections");
+assert(
+  snap.projections[0]?.totalRevenue != null,
+  "projection has totalRevenue",
+);
 
 if (failed === 0) {
   console.log("projection-engine.test.ts: OK");

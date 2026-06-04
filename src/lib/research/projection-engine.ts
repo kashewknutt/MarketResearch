@@ -1,6 +1,7 @@
 import { formatMoney } from "@/lib/currency";
 import type {
   FinancialAssumptions,
+  FinancialMetricWorkbook,
   FinancialMonthlyPlans,
   FinancialSnapshot,
   OnboardingProfile,
@@ -8,10 +9,9 @@ import type {
 import { createProvenance } from "@/lib/db/provenance";
 import { sanitizeAssumptions } from "@/lib/research/assumption-bounds";
 import {
-  buildDefaultMonthlyPlans,
-  computeBothScenarios,
-  normalizeMonthlyPlans,
-} from "@/lib/research/financial-timeline-engine";
+  computePlBothScenarios,
+  normalizeMetricWorkbook,
+} from "@/lib/research/financial-pl-engine";
 import { migrateAssumptionsToLineItems } from "@/lib/research/expense-line-items";
 
 export function defaultAssumptions(profile: OnboardingProfile): FinancialAssumptions {
@@ -56,20 +56,22 @@ export function buildProjections(
   rawAssumptions: FinancialAssumptions,
   narrative = "",
   leverageVariables: string[] = [],
-  monthlyPlansInput?: FinancialMonthlyPlans,
+  workbookInput?: FinancialMetricWorkbook,
+  legacyPlans?: FinancialMonthlyPlans,
 ): FinancialSnapshot {
   const months = Math.max(1, Math.min(50, profile.goalMonths));
   const defaults = defaultAssumptions(profile);
   const assumptions = sanitizeAssumptions(profile, rawAssumptions, defaults);
 
-  const monthlyPlans = monthlyPlansInput
-    ? normalizeMonthlyPlans(profile, assumptions, monthlyPlansInput)
-    : buildDefaultMonthlyPlans(profile, assumptions);
-
-  const { conservative, ambitious, active } = computeBothScenarios(
+  const metricWorkbook = normalizeMetricWorkbook(
     profile,
-    assumptions,
-    monthlyPlans,
+    workbookInput,
+    legacyPlans,
+  );
+
+  const { conservative, ambitious, active } = computePlBothScenarios(
+    profile,
+    metricWorkbook,
   );
 
   const gapToGoal = Math.round(profile.targetMrr - active.finalMrr);
@@ -84,7 +86,15 @@ export function buildProjections(
     aggressive: ambitious.mrrSeries,
   };
 
-  const projections = active.projections;
+  const projections = active.projections.map((p, i) => ({
+    ...p,
+    plSummaries: active.summaries,
+    pipelineNeeded: Math.max(
+      0,
+      Math.round(profile.targetMrr - (active.summaries[i]?.recurringMrr ?? p.revenue)),
+    ),
+  }));
+
   const totalExpenses = projections.reduce((s, p) => s + p.expenses, 0);
   const items = assumptions.expenseLineItems ?? [];
   const categoryTotals = items.reduce(
@@ -107,7 +117,7 @@ export function buildProjections(
       value: assumptions,
       ...createProvenance("ai"),
     },
-    monthlyPlans,
+    metricWorkbook,
     projections,
     scenarios,
     gapToGoal,
@@ -117,14 +127,14 @@ export function buildProjections(
       leverageVariables.length > 0
         ? leverageVariables
         : [
-            "Grow recurring low-ticket clients each month",
-            "Schedule ~3 high-ticket deals per year in specific months",
-            "Plan rare whale deals in ambitious scenario",
-            "Tune monthly expense table to match hiring and ads",
+            "Tune revenue rows (small clients, enterprise, huge deals) per month",
+            "Align expense rows with hiring and tooling plans",
+            "Compare Conservative vs Ambitious P&L before committing",
+            "Watch months where outflow exceeds inflow (negative net profit)",
           ],
     narrative:
       narrative ||
-      `Table-driven plan from ${formatMoney(profile.currentMrr, profile.currency)} toward ${formatMoney(profile.targetMrr, profile.currency)} over ${months} months. Edit monthly income (Conservative vs Ambitious) and expenses; MRR grows from recurring low-ticket adds plus lumpy high-ticket and whale cash.`,
+      `P&L model for ${profile.serviceDomain}: ${formatMoney(profile.currentMrr, profile.currency)} starting MRR toward ${formatMoney(profile.targetMrr, profile.currency)} over ${months} months. Edit domain-specific revenue and expense metrics per month; totals, EBITDA, and margin are computed automatically.`,
     provenance: createProvenance("ai"),
   };
 }

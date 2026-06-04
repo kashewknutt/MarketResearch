@@ -106,6 +106,38 @@ export const socialPlatformSchema = z.object({
   citations: z.array(citationSchema),
 });
 
+const financialMetricDefSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  kind: z.enum(["revenue", "expense"]),
+  group: z.string().optional(),
+  recurring: z.boolean().optional(),
+  order: z.number(),
+  notes: z.string().optional(),
+});
+
+export const financialMetricWorkbookAiSchema = z.object({
+  metrics: z.array(financialMetricDefSchema).min(3),
+  conservative: z.record(z.string(), z.array(z.number())),
+  ambitious: z.record(z.string(), z.array(z.number())),
+  monthlyChurnRate: z.number().min(0).max(0.5).optional(),
+  narrative: z.string().optional(),
+  leverageVariables: z.array(z.string()).optional(),
+  expenseLineItems: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        category: z.enum(["people", "tools", "marketing", "operations", "other"]),
+        monthlyAmount: z.number(),
+        headcount: z.number().optional(),
+        unitCost: z.number().optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
 export function safeParse<T>(schema: z.ZodType<T>, data: unknown): T | null {
   const result = schema.safeParse(data);
   return result.success ? result.data : null;
