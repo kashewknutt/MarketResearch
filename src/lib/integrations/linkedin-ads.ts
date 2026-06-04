@@ -6,88 +6,50 @@ import type {
   OnboardingProfile,
 } from "@/lib/types/domain";
 import {
-  linkedInCompanyUrlFromProfile,
-  linkedinStatus,
-} from "./linkedin";
+  fetchAdAnalyticsForAccount,
+  verifyLinkedInAdAccountAccess,
+} from "./linkedin-ad-analytics";
+import { linkedInCompanyUrlFromProfile } from "./linkedin";
+import { linkedInOAuthConfigured } from "./linkedin-oauth";
 
 /** Try LinkedIn Advertising API ad analytics (requires ad account + token). */
 async function fetchAdAnalyticsFromApi(
   accountId: string,
   currency: string,
 ): Promise<LinkedInAdHistory | null> {
-  const token = process.env.LINKEDIN_ACCESS_TOKEN;
-  if (!token) return null;
-
-  const now = new Date();
-  const startYear = now.getFullYear() - 1;
-  const accountUrn = `urn:li:sponsoredAccount:${accountId}`;
-  const url = new URL("https://api.linkedin.com/rest/adAnalytics");
-  url.searchParams.set("q", "analytics");
-  url.searchParams.set("pivot", "ACCOUNT");
-  url.searchParams.set("timeGranularity", "MONTHLY");
-  url.searchParams.set(
-    "dateRange",
-    `(start:(year:${startYear},month:1,day:1),end:(year:${now.getFullYear()},month:${now.getMonth() + 1},day:${now.getDate()}))`,
-  );
-  url.searchParams.set("accounts", `List(${encodeURIComponent(accountUrn)})`);
-  url.searchParams.set("fields", "costInLocalCurrency,dateRange");
-
-  try {
-    const res = await fetch(url.toString(), {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "LinkedIn-Version": "202401",
-        "X-Restli-Protocol-Version": "2.0.0",
-      },
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      console.warn("LinkedIn adAnalytics:", res.status, text.slice(0, 200));
-      return null;
-    }
-
-    const data = (await res.json()) as {
-      elements?: Array<{
-        costInLocalCurrency?: string;
-        dateRange?: { start?: { year: number; month: number } };
-      }>;
-    };
-
-    const monthlySpend = (data.elements ?? [])
-      .map((el) => {
-        const y = el.dateRange?.start?.year;
-        const m = el.dateRange?.start?.month;
-        if (!y || !m) return null;
-        const amount = parseFloat(el.costInLocalCurrency ?? "0") || 0;
-        return {
-          month: `${y}-${String(m).padStart(2, "0")}`,
-          amount: Math.round(amount),
-          currency,
-        };
-      })
-      .filter((x): x is NonNullable<typeof x> => x !== null);
-
-    if (!monthlySpend.length) return null;
-
-    const totalLast12Months = monthlySpend.reduce((s, x) => s + x.amount, 0);
-    return {
-      available: true,
-      message: "Loaded from LinkedIn Advertising API (ad account analytics).",
-      accountId,
-      totalLast12Months,
-      currency,
-      monthlySpend,
-      citations: [
-        {
-          title: "LinkedIn Advertising API — adAnalytics",
-          uri: "https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting",
-        },
-      ],
-    };
-  } catch (err) {
-    console.warn("LinkedIn adAnalytics fetch failed:", err);
+  const result = await fetchAdAnalyticsForAccount(accountId, { monthsBack: 12 });
+  if (!result.ok) {
+    console.warn(
+      "LinkedIn adAnalytics:",
+      result.status,
+      result.body?.slice(0, 300),
+    );
     return null;
   }
+
+  const monthlySpend = result.rows.map((r) => ({
+    month: r.month,
+    amount: r.amount,
+    currency,
+  }));
+
+  if (!monthlySpend.length) return null;
+
+  const totalLast12Months = monthlySpend.reduce((s, x) => s + x.amount, 0);
+  return {
+    available: true,
+    message: "Loaded from LinkedIn Advertising API (ad account analytics).",
+    accountId,
+    totalLast12Months,
+    currency,
+    monthlySpend,
+    citations: [
+      {
+        title: "LinkedIn Advertising API — adAnalytics",
+        uri: "https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting/ads-reporting?view=li-lms-2026-05",
+      },
+    ],
+  };
 }
 
 /** Estimate historical ad spend via search when API is unavailable. */
@@ -185,7 +147,7 @@ export function applyLinkedInAdsToLineItems(
 export async function fetchLinkedInAdHistory(
   profile: OnboardingProfile,
 ): Promise<LinkedInAdHistory> {
-  const token = Boolean(process.env.LINKEDIN_ACCESS_TOKEN);
+  const token = linkedInOAuthConfigured();
   const accountId = process.env.LINKEDIN_AD_ACCOUNT_ID?.trim();
   const companyUrl = linkedInCompanyUrlFromProfile(profile.socialLinks);
 

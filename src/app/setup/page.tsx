@@ -70,9 +70,12 @@ export default function SetupPage() {
     router.push("/onboarding");
   };
 
-  const passedCount =
-    report?.checks.filter((c) => c.state === "passed").length ?? 0;
-  const totalCount = report?.checks.length ?? 0;
+  const requiredPassed = report?.requiredPassed ?? 0;
+  const requiredTotal = report?.requiredTotal ?? 0;
+  const optionalChecks =
+    report?.checks.filter(
+      (c) => c.id === "reddit_optional" || c.id === "linkedin_optional",
+    ) ?? [];
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50/40 via-white to-violet-50/30 px-6 py-12">
@@ -99,14 +102,20 @@ export default function SetupPage() {
               <p className="text-sm text-slate-600">
                 {report.allPassed ? (
                   <span className="font-medium text-emerald-700">
-                    All {totalCount} requirements passed
+                    All {requiredTotal} required checks passed
                   </span>
                 ) : (
                   <span>
                     <span className="font-medium text-amber-700">
-                      {passedCount} of {totalCount} passed
+                      {requiredPassed} of {requiredTotal} required passed
                     </span>
-                    {" — fix pending items to continue"}
+                    {" — fix required items to continue"}
+                  </span>
+                )}
+                {optionalChecks.some((c) => c.state === "skipped") && (
+                  <span className="mt-1 block text-xs text-slate-500">
+                    Optional Reddit/LinkedIn skipped or not configured — add keys in
+                    .env for fuller research.
                   </span>
                 )}
               </p>
@@ -125,7 +134,8 @@ export default function SetupPage() {
         <ul className="mt-6 space-y-3">
           {phase === "checking" && !report && (
             <li className="rounded-xl border border-slate-100 bg-white p-5 text-sm text-slate-500">
-              Verifying API key, Gemini, Google Search, billing, and local storage…
+              Verifying Gemini, Google Search, billing, storage, and optional
+              Reddit/LinkedIn…
             </li>
           )}
           {report?.checks.map((item) => (
@@ -162,11 +172,18 @@ export default function SetupPage() {
             </ul>
           </div>
           <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-5">
-            <h2 className="text-sm font-semibold text-slate-800">Not required</h2>
+            <h2 className="text-sm font-semibold text-slate-800">Optional</h2>
             <p className="mt-2 text-xs text-slate-500">
-              These use OAuth 2.0 clients or service accounts — this app never calls them:
+              Reddit and LinkedIn are checked only when credentials exist in{" "}
+              <code className="rounded bg-white/80 px-1">.env</code>. Failures do not
+              block onboarding.
             </p>
             <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-slate-600">
+              <li>Reddit — post signals in research</li>
+              <li>LinkedIn — Advertising API ad spend in financials</li>
+            </ul>
+            <p className="mt-3 text-xs text-slate-500">Never used by this app:</p>
+            <ul className="mt-1 list-inside list-disc space-y-1 text-xs text-slate-600">
               {SEARCH_INTEGRATION.notRequired.map((item) => (
                 <li key={item}>{item}</li>
               ))}
@@ -185,7 +202,8 @@ export default function SetupPage() {
           </button>
           {report && !report.allPassed && (
             <p className="self-center text-xs text-slate-500">
-              All checks must pass before onboarding opens.
+              All required Gemini and storage checks must pass. Optional integrations
+              do not block continue.
             </p>
           )}
         </div>
@@ -206,6 +224,10 @@ function RequirementRow({
       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
         ✓
       </span>
+    ) : item.state === "skipped" ? (
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+        —
+      </span>
     ) : item.state === "failed" ? (
       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-800">
         !
@@ -221,9 +243,11 @@ function RequirementRow({
       className={`rounded-xl border bg-white p-5 transition-opacity ${
         item.state === "passed"
           ? "border-emerald-100"
-          : item.state === "failed"
-            ? "border-amber-200"
-            : "border-slate-100"
+          : item.state === "skipped"
+            ? "border-slate-100 bg-slate-50/50"
+            : item.state === "failed"
+              ? "border-amber-200"
+              : "border-slate-100"
       } ${loading ? "opacity-60" : ""}`}
     >
       <div className="flex gap-4">
@@ -233,7 +257,11 @@ function RequirementRow({
           <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>
           <p
             className={`mt-2 text-sm ${
-              item.state === "passed" ? "text-emerald-800" : "text-slate-700"
+              item.state === "passed"
+                ? "text-emerald-800"
+                : item.state === "skipped"
+                  ? "text-slate-600"
+                  : "text-slate-700"
             }`}
           >
             {item.message}
@@ -241,7 +269,7 @@ function RequirementRow({
           {item.detail && (
             <p className="mt-1 text-xs text-slate-400">{item.detail}</p>
           )}
-          {item.state === "failed" && item.actionUrl && (
+          {(item.state === "failed" || item.state === "skipped") && item.actionUrl && (
             <a
               href={item.actionUrl}
               target="_blank"

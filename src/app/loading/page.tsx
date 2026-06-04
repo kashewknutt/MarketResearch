@@ -1,27 +1,62 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import type { ResearchJob } from "@/lib/types/domain";
+
+const POLL_MS = 3000;
+
+function formatElapsed(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+}
 
 function LoadingContent() {
   const router = useRouter();
   const params = useSearchParams();
   const jobId = params.get("jobId");
   const [job, setJob] = useState<ResearchJob | null>(null);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!jobId) return;
+
+    let cancelled = false;
+
     const poll = async () => {
-      const res = await fetch(`/api/research/status?id=${jobId}`);
-      const data = await res.json();
-      setJob(data.job);
+      try {
+        const res = await fetch(`/api/research/status?id=${jobId}`);
+        const data = await res.json();
+        if (cancelled) return;
+        const next = data.job as ResearchJob | null;
+        setJob(next);
+
+        if (next?.status === "completed" || next?.status === "failed") {
+          if (pollRef.current) {
+            clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+        }
+      } catch {
+        /* keep polling on transient errors */
+      }
     };
-    poll();
-    const id = setInterval(poll, 1500);
-    return () => clearInterval(id);
+
+    void poll();
+    pollRef.current = setInterval(() => void poll(), POLL_MS);
+
+    return () => {
+      cancelled = true;
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [jobId]);
 
   useEffect(() => {
@@ -30,10 +65,22 @@ function LoadingContent() {
     }
   }, [job?.status, router]);
 
+  useEffect(() => {
+    if (!job?.startedAt || job.status !== "running") return;
+    const start = new Date(job.startedAt).getTime();
+    const tick = () =>
+      setElapsedSec(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [job?.startedAt, job?.status]);
+
   const completed = job?.stages.filter((s) => s.status === "completed").length ?? 0;
-  const total = job?.stages.length ?? 6;
+  const total = job?.stages.length ?? 1;
   const pct = Math.round((completed / total) * 100);
   const failedStage = job?.stages.find((s) => s.status === "failed");
+  const runningStage = job?.stages.find((s) => s.status === "running");
+  const isSlow = elapsedSec > 120 && job?.status === "running";
 
   if (job?.status === "failed") {
     return (
@@ -68,16 +115,36 @@ function LoadingContent() {
       <div className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-8 shadow-sm">
         <h1 className="text-xl font-semibold text-slate-800">Research in progress</h1>
         <p className="mt-2 text-sm text-slate-500">
-          Running market research, projections, and recommendations in parallel where possible.
+          The app checks progress every few seconds — repeated{" "}
+          <code className="rounded bg-slate-100 px-1 text-xs">/api/research/status</code>{" "}
+          lines in the terminal are normal, not a hang.
         </p>
+        {runningStage && (
+          <p className="mt-3 rounded-lg bg-violet-50 px-3 py-2 text-sm text-violet-900">
+            Current step: <strong>{runningStage.label}</strong>
+            {job?.startedAt && (
+              <span className="mt-1 block text-xs font-normal text-violet-700">
+                Elapsed {formatElapsed(elapsedSec)}
+              </span>
+            )}
+          </p>
+        )}
+        {isSlow && (
+          <p className="mt-2 text-xs text-amber-700">
+            This step calls Gemini (and sometimes LinkedIn/Reddit). Large profiles can
+            take 5–15+ minutes. Leave this page open; it will redirect when finished.
+          </p>
+        )}
         <div className="mt-6 h-2 overflow-hidden rounded-full bg-slate-100">
           <div
             className="h-full rounded-full bg-violet-400 transition-all duration-500"
             style={{ width: `${pct}%` }}
           />
         </div>
-        <p className="mt-2 text-xs text-slate-400">{pct}% complete</p>
-        <ul className="mt-6 space-y-3">
+        <p className="mt-2 text-xs text-slate-400">
+          {completed} of {total} stages ({pct}%)
+        </p>
+        <ul className="mt-6 max-h-64 space-y-3 overflow-y-auto">
           {job?.stages.map((stage) => (
             <li key={stage.id} className="flex items-center gap-3 text-sm">
               <span
@@ -85,7 +152,7 @@ function LoadingContent() {
                   stage.status === "completed"
                     ? "bg-emerald-400"
                     : stage.status === "running"
-                      ? "bg-violet-400 animate-pulse"
+                      ? "animate-pulse bg-violet-400"
                       : stage.status === "failed"
                         ? "bg-rose-400"
                         : "bg-slate-200"
@@ -94,7 +161,7 @@ function LoadingContent() {
               <span className="min-w-0 flex-1 text-slate-700">{stage.label}</span>
               {stage.error ? (
                 <span className="text-xs text-rose-600">{stage.error}</span>
-              ) : stage.message ? (
+              ) : stage.message && stage.status !== "pending" ? (
                 <span className="text-xs text-slate-400">{stage.message}</span>
               ) : null}
             </li>

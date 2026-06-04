@@ -12,11 +12,18 @@ import {
   verifyGoogleSearchGrounding,
 } from "@/lib/ai/gemini";
 import { getDataDir } from "@/lib/db/paths";
+import {
+  linkedinEnvPresence,
+  redditEnvPresence,
+  verifyLinkedInConnection,
+  verifyRedditConnection,
+} from "@/lib/setup/integration-checks";
 import type {
   RequirementCheckResult,
   RequirementId,
   SetupRequirementsReport,
 } from "@/lib/setup/types";
+import { REQUIRED_REQUIREMENT_IDS } from "@/lib/setup/types";
 
 const LINKS = {
   apiKey: "https://aistudio.google.com/apikey",
@@ -41,6 +48,23 @@ function check(
     label,
     description,
     state: passed ? "passed" : "failed",
+    message,
+    ...options,
+  };
+}
+
+function checkSkipped(
+  id: RequirementId,
+  label: string,
+  description: string,
+  message: string,
+  options?: { detail?: string; actionLabel?: string; actionUrl?: string },
+): RequirementCheckResult {
+  return {
+    id,
+    label,
+    description,
+    state: "skipped",
     message,
     ...options,
   };
@@ -265,6 +289,91 @@ function checkLocalStorage(): RequirementCheckResult {
   }
 }
 
+async function checkRedditOptional(): Promise<RequirementCheckResult> {
+  const presence = redditEnvPresence();
+  const readme = "README — Reddit API";
+
+  if (presence === "none") {
+    return checkSkipped(
+      "reddit_optional",
+      "Reddit API (optional)",
+      "Enriches research with Reddit post signals.",
+      "Skipped — no Reddit variables in .env. Add Reddit script app credentials (see README) for richer research.",
+      { actionLabel: readme, actionUrl: "https://www.reddit.com/prefs/apps" },
+    );
+  }
+
+  if (presence === "partial") {
+    return check(
+      "reddit_optional",
+      "Reddit API (optional)",
+      "Enriches research with Reddit post signals.",
+      false,
+      "Incomplete Reddit config — script apps need REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USER_AGENT, REDDIT_USERNAME, and REDDIT_PASSWORD.",
+      { actionLabel: readme, actionUrl: "https://www.reddit.com/prefs/apps" },
+    );
+  }
+
+  const result = await verifyRedditConnection();
+  return check(
+    "reddit_optional",
+    "Reddit API (optional)",
+    "Enriches research with Reddit post signals.",
+    result.ok,
+    result.message,
+    result.ok
+      ? { detail: result.detail }
+      : { actionLabel: readme, actionUrl: "https://www.reddit.com/prefs/apps", detail: result.detail },
+  );
+}
+
+async function checkLinkedInOptional(): Promise<RequirementCheckResult> {
+  const presence = linkedinEnvPresence();
+
+  if (presence === "none") {
+    return checkSkipped(
+      "linkedin_optional",
+      "LinkedIn Advertising API (optional)",
+      "Imports real LinkedIn ad spend into Financial Analysis when configured.",
+      "Skipped — no LinkedIn variables in .env. Add Advertising API tokens (see README) for ad spend and stronger signals.",
+      {
+        actionLabel: "README — LinkedIn",
+        actionUrl: "https://learn.microsoft.com/en-us/linkedin/marketing/getting-started",
+      },
+    );
+  }
+
+  if (presence === "partial") {
+    return check(
+      "linkedin_optional",
+      "LinkedIn Advertising API (optional)",
+      "Imports real LinkedIn ad spend into Financial Analysis when configured.",
+      false,
+      "Incomplete LinkedIn config — set LINKEDIN_ACCESS_TOKEN (or REFRESH_TOKEN + CLIENT_ID + CLIENT_SECRET).",
+      {
+        actionLabel: "README — LinkedIn",
+        actionUrl: "https://learn.microsoft.com/en-us/linkedin/marketing/getting-started",
+      },
+    );
+  }
+
+  const result = await verifyLinkedInConnection();
+  return check(
+    "linkedin_optional",
+    "LinkedIn Advertising API (optional)",
+    "Imports real LinkedIn ad spend into Financial Analysis when configured.",
+    result.ok,
+    result.message,
+    result.ok
+      ? { detail: result.detail }
+      : {
+          actionLabel: "README — LinkedIn",
+          actionUrl: "https://learn.microsoft.com/en-us/linkedin/marketing/getting-started",
+          detail: result.detail,
+        },
+  );
+}
+
 export async function runSetupRequirementsCheck(): Promise<SetupRequirementsReport> {
   const checks: RequirementCheckResult[] = [];
 
@@ -278,12 +387,21 @@ export async function runSetupRequirementsCheck(): Promise<SetupRequirementsRepo
   checks.push(await checkBillingQuota());
   checks.push(checkLocalStorage());
 
-  const allPassed = checks.every((c) => c.state === "passed");
+  checks.push(await checkRedditOptional());
+  checks.push(await checkLinkedInOptional());
+
+  const requiredChecks = checks.filter((c) =>
+    REQUIRED_REQUIREMENT_IDS.includes(c.id),
+  );
+  const requiredPassed = requiredChecks.filter((c) => c.state === "passed").length;
+  const allPassed = requiredChecks.every((c) => c.state === "passed");
 
   return {
     allPassed,
     checkedAt: new Date().toISOString(),
     checks,
+    requiredPassed,
+    requiredTotal: requiredChecks.length,
   };
 }
 

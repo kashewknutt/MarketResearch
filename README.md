@@ -104,8 +104,10 @@ Add these to `.env.local` when you want extra signals. The app still runs withou
 
 | Variables | Purpose |
 |-----------|---------|
-| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` | Reddit search signals during research |
-| `LINKEDIN_ACCESS_TOKEN` | **Advertising API** — OAuth token with ad reporting scopes |
+| `REDDIT_*` (client id, secret, user agent, username, password) | Reddit search signals during research |
+| `LINKEDIN_ACCESS_TOKEN` | **Advertising API** — current OAuth access token |
+| `LINKEDIN_REFRESH_TOKEN` | **Advertising API** — used to refresh access token when it expires |
+| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | Required for automatic token refresh |
 | `LINKEDIN_AD_ACCOUNT_ID` | **Advertising API** — sponsored ad account ID for real spend in **Financial Analysis** |
 | `GEMINI_BILLING_TIER` | `paid` (default) or `free` — affects cost estimates on **API Costs** |
 | `MARKET_RESEARCH_DATA_DIR` | Override where SQLite and snapshots are stored (Electron sets this automatically in production) |
@@ -150,24 +152,37 @@ Used for public post search during research (via [snoowrap](https://github.com/n
 
    Replace `your_reddit_username` with your actual handle (no spaces in the username part).
 
-8. Add to `.env.local` and **restart the dev server**:
+8. Add the **Reddit account username and password** for the same user that owns the app (script apps require this for [snoowrap](https://github.com/not-an-aardvark/snoowrap)):
+
+   ```env
+   REDDIT_USERNAME=your_reddit_username
+   REDDIT_PASSWORD=your_reddit_password
+   ```
+
+   Use a dedicated Reddit account if possible; never commit real passwords to git.
+
+9. Add to `.env.local` and **restart the dev server**:
 
    ```env
    REDDIT_CLIENT_ID=your_client_id_here
    REDDIT_CLIENT_SECRET=your_secret_here
    REDDIT_USER_AGENT=market-research:1.0 (by /u/your_reddit_username)
+   REDDIT_USERNAME=your_reddit_username
+   REDDIT_PASSWORD=your_reddit_password
    ```
 
 **Notes**
 
 - The app account must not be suspended; keep usage within [Reddit API rules](https://support.reddithelp.com/hc/en-us/articles/16160319875093-Responsible-Builder-Policy).
-- If search fails, double-check app type is **script**, the user agent includes your `/u/...` name, and there are no extra quotes around values in `.env.local`.
+- If search fails, double-check app type is **script**, all five variables are set, and the user agent includes your `/u/...` name.
 
 ---
 
 ### LinkedIn API — tokens and env vars (Advertising API only)
 
-This app calls **one** LinkedIn product: [**Advertising API**](https://learn.microsoft.com/en-us/linkedin/marketing/getting-started) (`adAnalytics` for monthly spend in **Financial Analysis**). It does **not** use Community Management API, Lead Sync, or other products—do not request them on this app (LinkedIn may require separate apps for other products anyway).
+This app calls **one** LinkedIn product: [**Advertising API**](https://learn.microsoft.com/en-us/linkedin/marketing/getting-started) (`adAnalytics` for monthly spend in **Financial Analysis**). API requests use the versioned header **`LinkedIn-Version: 202605`** (May 2026). Override with `LINKEDIN_API_VERSION` in `.env` if LinkedIn releases a newer month. Older values like `202401` return HTTP 426.
+
+It does **not** use Community Management API, Lead Sync, or other products—do not request them on this app (LinkedIn may require separate apps for other products anyway).
 
 Leads and marketing copy use **Gemini + Google Search**; your company LinkedIn URL in onboarding is context only.
 
@@ -212,9 +227,9 @@ The app expects a **Bearer access token** in `.env.local`, not the client secret
 
 4. Select **Advertising API** scopes only (ad reporting / account read).
 
-5. Generate the token and copy it immediately → **`LINKEDIN_ACCESS_TOKEN`**
+5. Generate the token and copy **access** and **refresh** tokens into `.env.local` when the tool provides both.
 
-   Tokens from this tool are often short-lived; refresh or regenerate when research fails with `401`.
+   Portal-generated tokens are often short-lived; with **`LINKEDIN_REFRESH_TOKEN`** plus client id/secret, the app refreshes automatically.
 
 **Option B — Authorization code flow (longer-lived refresh)**
 
@@ -244,9 +259,9 @@ The app expects a **Bearer access token** in `.env.local`, not the client secret
 
    Use `http://localhost:3000` in both places if you run `npm run dev:data` instead of Electron.
 
-5. From the JSON response, copy **`access_token`** → **`LINKEDIN_ACCESS_TOKEN`**
-
-   Store **`refresh_token`** somewhere safe if provided; you can exchange it again when the access token expires.
+5. From the JSON response, copy:
+   - **`access_token`** → **`LINKEDIN_ACCESS_TOKEN`**
+   - **`refresh_token`** → **`LINKEDIN_REFRESH_TOKEN`** (required for automatic refresh in this app)
 
 Official reference: [LinkedIn OAuth 2.0](https://learn.microsoft.com/en-us/linkedin/shared/authentication/authentication) and [Advertising API overview](https://learn.microsoft.com/en-us/linkedin/marketing/getting-started).
 
@@ -269,23 +284,25 @@ Only needed if you want **actual** monthly spend from LinkedIn instead of AI est
 #### 4. Add to `.env.local`
 
 ```env
-# Used when refreshing tokens (optional in .env; helpful for OAuth)
-# LINKEDIN_CLIENT_ID=
-# LINKEDIN_CLIENT_SECRET=
-
+LINKEDIN_CLIENT_ID=your_app_client_id
+LINKEDIN_CLIENT_SECRET=your_app_client_secret
 LINKEDIN_ACCESS_TOKEN=your_oauth_access_token
+LINKEDIN_REFRESH_TOKEN=your_oauth_refresh_token
 LINKEDIN_AD_ACCOUNT_ID=512345678
 ```
 
 Restart the dev server after saving.
 
+**Auto-refresh:** When the access token expires, the app calls LinkedIn’s token endpoint with `LINKEDIN_REFRESH_TOKEN` and updates `data/linkedin-oauth.json` (under your data directory). You can leave `.env` as-is after the first refresh, or copy the new access token from that file if you prefer.
+
 **What each variable does in this app**
 
 | Variable | Read by app? | Used for |
 |----------|----------------|----------|
-| `LINKEDIN_CLIENT_ID` | No (OAuth only) | Generating tokens in the portal or curl |
-| `LINKEDIN_CLIENT_SECRET` | No (OAuth only) | Same |
-| `LINKEDIN_ACCESS_TOKEN` | **Yes** | Advertising API `adAnalytics` (with ad account ID) |
+| `LINKEDIN_CLIENT_ID` | **Yes** | OAuth refresh (with secret + refresh token) |
+| `LINKEDIN_CLIENT_SECRET` | **Yes** | Same |
+| `LINKEDIN_ACCESS_TOKEN` | **Yes** | Advertising API `adAnalytics` (initial token) |
+| `LINKEDIN_REFRESH_TOKEN` | **Yes** | Obtain new access tokens when expired |
 | `LINKEDIN_AD_ACCOUNT_ID` | **Yes** | Which ad account to read for **Financial Analysis** |
 
 Add your company **LinkedIn page URL** in onboarding **Online presence** — used as context for AI ad-spend estimates when the API is not configured or fails.
@@ -300,8 +317,10 @@ Add your company **LinkedIn page URL** in onboarding **Online presence** — use
 | `GEMINI_BILLING_TIER` | No | `paid` or `free` for cost display |
 | `MARKET_RESEARCH_DATA_DIR` | No | Local data directory (default: `data` under project or app user data in Electron) |
 | `REDDIT_*` | No | Reddit API credentials |
-| `LINKEDIN_ACCESS_TOKEN` | No* | Advertising API OAuth token (*optional; needed for real ad spend) |
-| `LINKEDIN_AD_ACCOUNT_ID` | No* | Sponsored ad account ID (*optional; pair with token) |
+| `LINKEDIN_ACCESS_TOKEN` | No* | Current access token |
+| `LINKEDIN_REFRESH_TOKEN` | No* | Refresh expired access tokens |
+| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | No* | OAuth refresh |
+| `LINKEDIN_AD_ACCOUNT_ID` | No* | Sponsored ad account ID |
 
 ---
 

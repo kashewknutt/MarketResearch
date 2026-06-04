@@ -1,18 +1,23 @@
 import type { IntegrationStatus } from "./types";
+import { linkedInOAuthConfigured } from "./linkedin-oauth";
 
 /** LinkedIn is optional; only Advertising API (ad analytics) is used when configured. */
 export function linkedinStatus(): IntegrationStatus {
-  const token = Boolean(process.env.LINKEDIN_ACCESS_TOKEN);
+  const token = linkedInOAuthConfigured();
   const account = Boolean(process.env.LINKEDIN_AD_ACCOUNT_ID?.trim());
+  const refresh = Boolean(process.env.LINKEDIN_REFRESH_TOKEN?.trim());
+  const oauth = Boolean(
+    process.env.LINKEDIN_CLIENT_ID?.trim() && process.env.LINKEDIN_CLIENT_SECRET?.trim(),
+  );
   const configured = token && account;
   return {
     name: "LinkedIn Advertising API",
     configured,
     message: configured
-      ? "Advertising API token and ad account ID configured"
+      ? `Advertising API ready${refresh && oauth ? " (auto-refresh enabled)" : ""}`
       : token
         ? "Set LINKEDIN_AD_ACCOUNT_ID for real ad spend (token present)"
-        : "Set LINKEDIN_ACCESS_TOKEN and LINKEDIN_AD_ACCOUNT_ID — see README (Advertising API only)",
+        : "Set LINKEDIN_ACCESS_TOKEN, LINKEDIN_REFRESH_TOKEN, client id/secret, and LINKEDIN_AD_ACCOUNT_ID — see README",
   };
 }
 
