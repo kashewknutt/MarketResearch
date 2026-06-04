@@ -1,13 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ProjectCard } from "@/components/project-card";
+import { useEffect, useMemo, useState } from "react";
+import { createColumnHelper } from "@tanstack/react-table";
+import { DataTable } from "@/components/ui/data-table";
+import { ProjectDetailSheet } from "@/components/project-detail-sheet";
+import { formatMoney } from "@/lib/currency";
 import type { MarketProject } from "@/lib/types/domain";
+import type { ColumnDef } from "@tanstack/react-table";
+
+const col = createColumnHelper<MarketProject>();
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<MarketProject[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [selected, setSelected] = useState<MarketProject | null>(null);
 
   useEffect(() => {
     fetch("/api/projects")
@@ -21,12 +28,39 @@ export default function ProjectsPage() {
   const filtered =
     filter === "all" ? projects : projects.filter((p) => p.region === filter);
 
+  const columns = useMemo(
+    () =>
+      [
+        col.accessor("title", { header: "Project", cell: (i) => i.getValue() }),
+        col.accessor("region", { header: "Region" }),
+        col.accessor("effort", { header: "Effort" }),
+        col.accessor("ticketSize", {
+          header: "Ticket",
+          cell: ({ row }) =>
+            formatMoney(row.original.ticketSize, row.original.currency),
+        }),
+        col.accessor("confidenceScore", {
+          header: "Confidence",
+          cell: (i) => {
+            const v = i.getValue();
+            return v != null ? `${Math.round(v * 100)}%` : "—";
+          },
+        }),
+        col.display({
+          id: "sources",
+          header: "Sources",
+          cell: ({ row }) => row.original.provenance.citations?.length ?? 0,
+        }),
+      ] as ColumnDef<MarketProject>[],
+    [],
+  );
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
         <p className="mt-1 text-sm text-slate-500">
-          10 active opportunities per region. Mark done to get a new AI-sourced project.
+          Evidence-backed opportunities per region. Click a row for full analysis.
         </p>
       </header>
       <div className="flex gap-2">
@@ -35,11 +69,19 @@ export default function ProjectsPage() {
           <FilterBtn key={r} active={filter === r} onClick={() => setFilter(r)} label={r} />
         ))}
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((p) => (
-          <ProjectCard key={p.id} project={p} />
-        ))}
-      </div>
+      <DataTable
+        data={filtered}
+        columns={columns}
+        onRowClick={(row) => setSelected(row)}
+      />
+      <ProjectDetailSheet
+        project={selected}
+        onClose={() => setSelected(null)}
+        onUpdated={(p) => {
+          setProjects((list) => list.map((x) => (x.id === p.id ? p : x)));
+          setSelected(p);
+        }}
+      />
     </div>
   );
 }

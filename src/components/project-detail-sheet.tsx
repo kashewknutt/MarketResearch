@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { EditableField } from "@/components/editable-field";
+import { CitationList } from "@/components/ui/citation-list";
+import { formatMoney } from "@/lib/currency";
 import type { MarketProject } from "@/lib/types/domain";
 
 interface ProjectDetailSheetProps {
@@ -52,9 +54,9 @@ export function ProjectDetailSheet({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-slate-100 bg-white shadow-xl">
+    <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <h2 className="text-base font-semibold text-slate-800">Project Details</h2>
+        <h2 className="text-base font-semibold text-slate-800">Project analysis</h2>
         <button
           type="button"
           onClick={onClose}
@@ -63,9 +65,11 @@ export function ProjectDetailSheet({
           Close
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+      <div className="flex-1 space-y-4 overflow-y-auto p-5">
         <span className="inline-block rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
           {project.region}
+          {project.confidenceScore != null &&
+            ` · ${Math.round(project.confidenceScore * 100)}% confidence`}
         </span>
         <EditableField
           label="Title"
@@ -87,6 +91,78 @@ export function ProjectDetailSheet({
           prefix={`${project.currency} `}
           onSave={(v) => patch({ ticketSize: Number(v) })}
         />
+
+        {project.rationale && (
+          <section className="rounded-lg bg-violet-50/40 p-4">
+            <p className="text-sm font-medium text-slate-800">Why this project</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-700">{project.rationale}</p>
+          </section>
+        )}
+
+        {project.regionalPricing && project.regionalPricing.length > 0 && (
+          <section>
+            <p className="mb-2 text-sm font-medium text-slate-800">Regional pricing (sourced)</p>
+            <table className="w-full text-xs">
+              <thead className="text-slate-500">
+                <tr>
+                  <th className="py-1 text-left">Region</th>
+                  <th className="py-1 text-left">Min–Max</th>
+                  <th className="py-1 text-left">Median</th>
+                </tr>
+              </thead>
+              <tbody>
+                {project.regionalPricing.map((rp) => (
+                  <tr key={rp.region} className="border-t border-slate-100">
+                    <td className="py-2">{rp.region}</td>
+                    <td className="py-2">
+                      {formatMoney(rp.min, rp.currency)} – {formatMoney(rp.max, rp.currency)}
+                    </td>
+                    <td className="py-2">{formatMoney(rp.median, rp.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {project.challenges && project.challenges.length > 0 && (
+          <section>
+            <p className="text-sm font-medium text-slate-800">Challenges</p>
+            <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
+              {project.challenges.map((c) => (
+                <li key={c}>{c}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {project.solutions && project.solutions.length > 0 && (
+          <section>
+            <p className="text-sm font-medium text-slate-800">Solutions</p>
+            <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
+              {project.solutions.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {project.precedents && project.precedents.length > 0 && (
+          <section>
+            <p className="text-sm font-medium text-slate-800">Precedents</p>
+            <div className="mt-2 space-y-2">
+              {project.precedents.map((p, i) => (
+                <div key={i} className="rounded-lg border border-slate-100 p-3 text-xs">
+                  <p className="font-medium text-slate-800">{p.company}</p>
+                  <p className="text-slate-600">{p.action}</p>
+                  <p className="mt-1 text-emerald-800">{p.reportedResult}</p>
+                  {p.metric && <p className="text-slate-500">Metric: {p.metric}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
           <p className="mb-2 font-medium text-slate-800">Explanation</p>
           <p className="text-xs leading-relaxed">{project.explanation}</p>
@@ -96,10 +172,14 @@ export function ProjectDetailSheet({
           <p className="mt-1 text-xs text-emerald-700">{project.nextStep}</p>
         </div>
         <p className="text-xs text-slate-500">{project.expectedValue}</p>
+
+        <section>
+          <p className="text-sm font-medium text-slate-800">Sources</p>
+          <CitationList citations={project.provenance.citations} />
+        </section>
+
         {doneError && (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            {doneError}
-          </p>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">{doneError}</p>
         )}
         <label className="flex items-center gap-2 rounded-lg border border-slate-100 p-3">
           <input

@@ -5,17 +5,17 @@ import { isGeminiApiError } from "@/lib/ai/gemini-errors";
 import {
   demandDiscoveryPrompt,
   domainUnderstandingPrompt,
-  financialVariablesPrompt,
   investmentPrompt,
-  marketingPrompt,
   strategyPrompt,
 } from "@/lib/ai/prompts";
 import { createProvenance } from "@/lib/db/provenance";
-import {
-  buildProjections,
-  defaultAssumptions,
-} from "@/lib/research/projection-engine";
 import { ensureFullProjectQueues } from "@/lib/research/project-generator";
+import { runCompetitorIntelligence } from "@/lib/research/stages/competitor-intelligence";
+import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
+import { runEnrichedMarketing } from "@/lib/research/stages/marketing-enriched";
+import { enrichProjectsForRegion } from "@/lib/research/stages/project-enrichment";
+import { runFinancialModeling } from "@/lib/research/stages/financial-modeling";
+import { runSocialStrategy } from "@/lib/research/stages/social-strategy";
 import { clearDemands, saveDemands } from "@/lib/store/demands";
 import {
   createInitialStages,
@@ -29,8 +29,6 @@ import type {
   FinancialAssumptions,
   FinancialSnapshot,
   InvestmentSnapshot,
-  MarketingItem,
-  MarketingSnapshot,
   OnboardingProfile,
   RegionCode,
   ResearchJob,
@@ -129,111 +127,6 @@ async function discoverDemands(
     currency: d.currency,
     provenance: createProvenance("search", result.citations, 0.85),
   }));
-}
-
-async function runFinancial(
-  profile: OnboardingProfile,
-  jobId: string,
-): Promise<FinancialSnapshot> {
-  const result = await generateStructuredJson<
-    FinancialAssumptions & {
-      narrative: string;
-      leverageVariables: string[];
-    }
-  >({
-    task: "financial_variables",
-    systemInstruction: "Financial analyst for service businesses. JSON only.",
-    userPrompt: financialVariablesPrompt(profile),
-    useGoogleSearch: false,
-    parse: (raw) =>
-      raw as FinancialAssumptions & {
-        narrative: string;
-        leverageVariables: string[];
-        },
-    trace: researchTrace(jobId, "research.financial_model", "financial_modeling"),
-  });
-
-  const defaults = defaultAssumptions(profile);
-  const { narrative, leverageVariables, ...rawAssumptions } = result.data;
-  const assumptions: FinancialAssumptions = {
-    ...defaults,
-    ...rawAssumptions,
-  };
-  const snapshot = buildProjections(
-    profile,
-    assumptions,
-    narrative,
-    leverageVariables,
-  );
-  snapshot.provenance = createProvenance("ai", result.citations, 0.8);
-  snapshot.assumptions = {
-    ...snapshot.assumptions,
-    ...createProvenance("ai", result.citations, 0.8),
-  };
-  return snapshot;
-}
-
-async function runMarketing(
-  profile: OnboardingProfile,
-  jobId: string,
-): Promise<MarketingSnapshot> {
-  type RawMarketingItem = {
-    title: string;
-    description: string;
-    priority: string;
-    region: string | null;
-  };
-  const result = await generateStructuredJson<{
-    positioning: string;
-    contentThemes: RawMarketingItem[];
-    offers: RawMarketingItem[];
-    channels: RawMarketingItem[];
-    proofAssets: RawMarketingItem[];
-  }>({
-    task: "marketing",
-    systemInstruction: "Marketing strategist for B2B service companies.",
-    userPrompt: marketingPrompt(profile),
-    useGoogleSearch: true,
-    parse: (raw) => {
-      const obj = raw as {
-        positioning: string;
-        contentThemes: RawMarketingItem[];
-        offers: RawMarketingItem[];
-        channels: RawMarketingItem[];
-        proofAssets: RawMarketingItem[];
-      };
-      return obj;
-    },
-    trace: researchTrace(jobId, "research.marketing", "marketing_planning"),
-  });
-
-  const toItems = (
-    category: string,
-    items: Array<{
-      title: string;
-      description: string;
-      priority: string;
-      region: string | null;
-    }>,
-  ): MarketingItem[] =>
-    items.map((item) => ({
-      id: randomUUID(),
-      category,
-      title: item.title,
-      description: item.description,
-      priority: item.priority as MarketingItem["priority"],
-      region: item.region ?? undefined,
-      provenance: createProvenance("search", result.citations, 0.8),
-    }));
-
-  return {
-    positioning: result.data.positioning,
-    contentThemes: toItems("content", result.data.contentThemes ?? []),
-    offers: toItems("offer", result.data.offers ?? []),
-    channels: toItems("channel", result.data.channels ?? []),
-    proofAssets: toItems("proof", result.data.proofAssets ?? []),
-    provenance: createProvenance("search", result.citations, 0.8),
-  };
 }
 
 async function runStrategy(
@@ -373,15 +266,35 @@ export async function startResearchPipeline(jobId: string): Promise<void> {
       await ensureFullProjectQueues(profile, jobId);
     });
 
+    await runStage("project_enrichment", async () => {
+      for (const region of profile.regions) {
+        await enrichProjectsForRegion(profile, region, jobId);
+      }
+    });
+
+    await runStage("competitor_intelligence", async () => {
+      const competitors = await runCompetitorIntelligence(profile, jobId);
+      await saveSnapshot("competitors", competitors);
+    });
+
+    await runStage("lead_discovery", async () => {
+      await runLeadDiscovery(profile, jobId);
+    });
+
     let financial!: FinancialSnapshot;
     await runStage("financial_modeling", async () => {
-      financial = await runFinancial(profile, jobId);
+      financial = await runFinancialModeling(profile, jobId);
       await saveSnapshot("financial", financial);
     });
 
     await runStage("marketing_planning", async () => {
-      const marketing = await runMarketing(profile, jobId);
+      const marketing = await runEnrichedMarketing(profile, jobId);
       await saveSnapshot("marketing", marketing);
+    });
+
+    await runStage("social_strategy", async () => {
+      const social = await runSocialStrategy(profile, jobId);
+      await saveSnapshot("marketing_social", social);
     });
 
     await runStage("investment_allocation", async () => {

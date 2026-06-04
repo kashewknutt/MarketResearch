@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RevenueGoalFields } from "@/components/revenue-goal-fields";
+import { SocialLinksFields } from "@/components/social-links-fields";
 import { DEFAULT_CURRENCY } from "@/lib/currency";
 import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
 
-const STEPS = ["Business", "Market", "Financials", "Goals"];
+const STEPS = ["Business", "Online presence", "Market", "Financials", "Goals"];
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export default function OnboardingPage() {
     serviceDomain: "",
     targetAudience: "",
     regions: [...DEFAULT_REGIONS],
+    socialLinks: [],
     currency: DEFAULT_CURRENCY,
     currentMrr: 0,
     targetMrr: 0,
@@ -76,10 +78,12 @@ export default function OnboardingPage() {
     step === 0
       ? form.businessName && form.serviceDomain
       : step === 1
-        ? form.targetAudience && form.regions.length > 0
+        ? true
         : step === 2
-          ? form.currentMrr >= 0 && form.targetMrr > 0
-          : form.goalMonths >= 1 && form.goalMonths <= 50;
+          ? form.targetAudience && form.regions.length > 0
+          : step === 3
+            ? form.currentMrr >= 0 && form.targetMrr > 0
+            : form.goalMonths >= 1 && form.goalMonths <= 50;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-violet-50/40 to-white px-6 py-12">
@@ -112,6 +116,12 @@ export default function OnboardingPage() {
             </>
           )}
           {step === 1 && (
+            <SocialLinksFields
+              links={form.socialLinks}
+              onChange={(links) => update("socialLinks", links)}
+            />
+          )}
+          {step === 2 && (
             <>
               <Field label="Target audience" value={form.targetAudience} onChange={(v) => update("targetAudience", v)} />
               <div>
@@ -139,7 +149,7 @@ export default function OnboardingPage() {
               </div>
             </>
           )}
-          {step === 2 && (
+          {step === 3 && (
             <RevenueGoalFields
               values={{
                 currency: form.currency,
@@ -158,7 +168,7 @@ export default function OnboardingPage() {
               }
             />
           )}
-          {step === 3 && (
+          {step === 4 && (
             <>
               <Field label="Strategic goals" value={form.strategicGoals} onChange={(v) => update("strategicGoals", v)} multiline />
               <Field label="Constraints (optional)" value={form.constraints} onChange={(v) => update("constraints", v)} multiline />

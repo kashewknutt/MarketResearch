@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
+import { syncLegacySpendFields } from "@/lib/research/expense-line-items";
+import { normalizeFinancialSnapshot } from "@/lib/research/normalize-financial";
 import { buildProjections } from "@/lib/research/projection-engine";
 import { getProfile } from "@/lib/store/settings";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type { FinancialAssumptions, FinancialSnapshot } from "@/lib/types/domain";
 
 export async function GET() {
-  const financial = await getSnapshot<FinancialSnapshot>("financial");
+  const raw = await getSnapshot<FinancialSnapshot>("financial");
   const profile = await getProfile();
+  const financial =
+    raw && profile ? normalizeFinancialSnapshot(raw, profile) : raw;
   return NextResponse.json({ financial, profile });
 }
 
@@ -24,7 +28,10 @@ export async function PATCH(request: Request) {
   let assumptions = existing.assumptions.value;
 
   if (body.assumptions) {
-    assumptions = { ...assumptions, ...body.assumptions } as FinancialAssumptions;
+    assumptions = syncLegacySpendFields({
+      ...assumptions,
+      ...body.assumptions,
+    } as FinancialAssumptions);
   }
   if (body.profile) {
     Object.assign(profile, body.profile);
@@ -36,6 +43,7 @@ export async function PATCH(request: Request) {
     body.narrative ?? existing.narrative,
     existing.leverageVariables,
   );
+  updated.linkedInAdHistory = existing.linkedInAdHistory;
   updated.assumptions = {
     ...existing.assumptions,
     value: assumptions,

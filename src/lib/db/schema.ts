@@ -51,6 +51,23 @@ export const pricingSnapshots = sqliteTable("pricing_snapshots", {
   fetchedAt: text("fetched_at").notNull(),
 });
 
+export const leads = sqliteTable("leads", {
+  id: text("id").primaryKey(),
+  region: text("region").notNull(),
+  status: text("status").notNull(),
+  data: text("data").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const researchArtifacts = sqliteTable("research_artifacts", {
+  id: text("id").primaryKey(),
+  jobId: text("job_id").notNull(),
+  stageId: text("stage_id").notNull(),
+  stepId: text("step_id").notNull(),
+  data: text("data").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
 export const apiCostEvents = sqliteTable("api_cost_events", {
   id: text("id").primaryKey(),
   createdAt: text("created_at").notNull(),

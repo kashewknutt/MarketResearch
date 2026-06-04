@@ -1,21 +1,62 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createColumnHelper } from "@tanstack/react-table";
+import { DataTable } from "@/components/ui/data-table";
+import { CitationList } from "@/components/ui/citation-list";
+import { Tabs } from "@/components/ui/tabs";
 import { GeminiFallback } from "@/components/gemini-fallback";
-import { ProjectCard } from "@/components/project-card";
-import type { MarketingItem, MarketingSnapshot, MarketProject } from "@/lib/types/domain";
+import { formatMoney } from "@/lib/currency";
+import type {
+  MarketingItem,
+  MarketingSnapshot,
+  MarketingSocialSnapshot,
+} from "@/lib/types/domain";
+import type { ColumnDef } from "@tanstack/react-table";
+
+const itemCol = createColumnHelper<MarketingItem>();
+
+function campaignColumns(currency: string): ColumnDef<MarketingItem>[] {
+  return [
+    itemCol.accessor("title", { header: "Campaign" }),
+    itemCol.accessor("priority", { header: "Priority" }),
+    itemCol.accessor("why", {
+      header: "Why",
+      cell: (i) => i.getValue() ?? "—",
+    }),
+    itemCol.display({
+      id: "cost",
+      header: `Est. cost (${currency})`,
+      cell: ({ row }) =>
+        row.original.estimatedCost != null
+          ? formatMoney(row.original.estimatedCost, row.original.estimatedCostCurrency ?? currency)
+          : "—",
+    }),
+    itemCol.display({
+      id: "sources",
+      header: "Sources",
+      cell: ({ row }) =>
+        (row.original.citations?.length ?? 0) + row.original.provenance.citations.length,
+    }),
+  ] as ColumnDef<MarketingItem>[];
+}
 
 export default function MarketingPage() {
+  const [tab, setTab] = useState("overview");
   const [marketing, setMarketing] = useState<MarketingSnapshot | null>(null);
-  const [projects, setProjects] = useState<MarketProject[]>([]);
+  const [social, setSocial] = useState<MarketingSocialSnapshot | null>(null);
+  const [currency, setCurrency] = useState("USD");
 
   useEffect(() => {
     fetch("/api/marketing")
       .then((r) => r.json())
       .then((d) => setMarketing(d.marketing));
-    fetch("/api/projects")
+    fetch("/api/marketing/social")
       .then((r) => r.json())
-      .then((d) => setProjects((d.projects ?? []).slice(0, 6)));
+      .then((d) => setSocial(d.social));
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((d) => setCurrency(d.profile?.currency ?? "USD"));
   }, []);
 
   if (!marketing) {
@@ -27,71 +68,77 @@ export default function MarketingPage() {
     );
   }
 
+  const allCampaigns = [
+    ...marketing.contentThemes,
+    ...marketing.offers,
+    ...marketing.channels,
+    ...marketing.proofAssets,
+  ];
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold text-slate-800">Marketing</h1>
-        <p className="mt-2 rounded-xl bg-emerald-50/50 p-4 text-sm text-slate-700">
-          {marketing.positioning}
-        </p>
+        <p className="mt-1 text-xs text-slate-500">Amounts in {currency} where applicable</p>
       </header>
 
-      <MarketingSection title="Content themes" items={marketing.contentThemes} />
-      <MarketingSection title="Offers to promote" items={marketing.offers} />
-      <MarketingSection title="Channel priorities" items={marketing.channels} />
-      <MarketingSection title="Proof & trust assets" items={marketing.proofAssets} />
+      <Tabs
+        tabs={[
+          { id: "overview", label: "Overview" },
+          { id: "campaigns", label: "Campaigns" },
+          { id: "social", label: "Social platforms" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
 
-      <section>
-        <h2 className="mb-4 text-sm font-semibold text-slate-700">
-          Projects to market now
-        </h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} />
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
+      {tab === "overview" && (
+        <p className="rounded-xl bg-emerald-50/50 p-4 text-sm text-slate-700">
+          {marketing.positioning}
+        </p>
+      )}
 
-function MarketingSection({
-  title,
-  items,
-}: {
-  title: string;
-  items: MarketingItem[];
-}) {
-  return (
-    <section>
-      <h2 className="mb-3 text-sm font-semibold text-slate-700">{title}</h2>
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="rounded-xl border border-slate-100 p-4"
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-medium text-slate-800">{item.title}</h3>
-              <span
-                className={`rounded-full px-2 py-0.5 text-[10px] ${
-                  item.priority === "high"
-                    ? "bg-rose-100 text-rose-700"
-                    : item.priority === "medium"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-slate-100 text-slate-600"
-                }`}
-              >
-                {item.priority}
-              </span>
+      {tab === "campaigns" && (
+        <div className="space-y-6">
+          <DataTable data={allCampaigns} columns={campaignColumns(currency)} />
+          {allCampaigns[0] && (
+            <div className="rounded-xl border border-slate-100 p-4">
+              <p className="text-sm font-medium text-slate-800">Sample precedent</p>
+              {allCampaigns[0].precedents?.[0] && (
+                <p className="mt-2 text-xs text-slate-600">
+                  {allCampaigns[0].precedents[0].company}: {allCampaigns[0].precedents[0].reportedResult}
+                </p>
+              )}
             </div>
-            <p className="mt-1 text-xs text-slate-500">{item.description}</p>
-            {item.region && (
-              <p className="mt-2 text-[10px] text-sky-600">{item.region}</p>
-            )}
-          </div>
-        ))}
-      </div>
-    </section>
+          )}
+        </div>
+      )}
+
+      {tab === "social" && (
+        <div className="space-y-4">
+          {!social?.platforms?.length ? (
+            <p className="text-sm text-slate-500">Run research to generate social playbooks.</p>
+          ) : (
+            social.platforms.map((p) => (
+              <div key={p.platform} className="rounded-xl border border-slate-100 p-5">
+                <h3 className="text-base font-semibold text-slate-800">{p.platform}</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Audience: {p.audience} · Cadence: {p.postingCadence}
+                </p>
+                <p className="mt-3 text-sm font-medium text-violet-800">How this differs</p>
+                <p className="text-xs text-slate-600">{p.differentiation}</p>
+                <p className="mt-3 text-sm font-medium text-slate-800">Tactics</p>
+                <ul className="list-inside list-disc text-xs text-slate-600">
+                  {p.tactics.map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+                <CitationList citations={p.citations} compact />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
   );
 }

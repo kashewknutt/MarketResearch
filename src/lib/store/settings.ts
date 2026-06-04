@@ -9,6 +9,7 @@ type StoredProfile = OnboardingProfile & { goalRevenue?: number };
 export function normalizeProfile(raw: StoredProfile): OnboardingProfile {
   return {
     ...raw,
+    socialLinks: raw.socialLinks ?? [],
     currency: normalizeCurrency(raw.currency ?? DEFAULT_CURRENCY),
     targetMrr: raw.targetMrr ?? raw.goalRevenue ?? 0,
   };

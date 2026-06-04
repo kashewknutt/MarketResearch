@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { RevenueGoalFields } from "@/components/revenue-goal-fields";
+import { SocialLinksFields } from "@/components/social-links-fields";
 import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
 import type { GeminiConnectionStatus } from "@/lib/ai/gemini";
 
@@ -136,6 +137,15 @@ function SettingsContent() {
           >
             Reset to US + India
           </button>
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700">Social profiles</h3>
+          <div className="mt-3">
+            <SocialLinksFields
+              links={profile.socialLinks ?? []}
+              onChange={(links) => setProfile({ ...profile, socialLinks: links })}
+            />
+          </div>
         </div>
         <RevenueGoalFields
           values={{

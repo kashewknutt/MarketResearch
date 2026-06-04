@@ -91,6 +91,27 @@ function migrate(sqlite: Database.Database) {
   `);
 
   migrateAiLogsCostColumn(sqlite);
+  migratePhase2Tables(sqlite);
+}
+
+function migratePhase2Tables(sqlite: Database.Database) {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      region TEXT NOT NULL,
+      status TEXT NOT NULL,
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS research_artifacts (
+      id TEXT PRIMARY KEY,
+      job_id TEXT NOT NULL,
+      stage_id TEXT NOT NULL,
+      step_id TEXT NOT NULL,
+      data TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
+  `);
 }
 
 function migrateAiLogsCostColumn(sqlite: Database.Database) {

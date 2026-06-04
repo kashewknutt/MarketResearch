@@ -10,6 +10,7 @@ Website: ${profile.website}
 Domain: ${profile.serviceDomain}
 Target audience: ${profile.targetAudience}
 Regions: ${profile.regions.join(", ")}
+Social: ${(profile.socialLinks ?? []).map((s) => `${s.platform}: ${s.url}`).join(", ") || "none"}
 Currency: ${profile.currency}
 Current MRR: ${formatMoney(profile.currentMrr, profile.currency)}
 Target MRR (monthly, end of horizon): ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months
@@ -82,6 +83,8 @@ export function financialVariablesPrompt(profile: OnboardingProfile): string {
   return `Suggest financial projection variables for ${profile.serviceDomain} service business.
 Currency: ${profile.currency}. Current MRR: ${formatMoney(profile.currentMrr, profile.currency)}. Target MRR: ${formatMoney(profile.targetMrr, profile.currency)} in ${profile.goalMonths} months.
 
+Estimate realistic monthly amounts for domain-specific expense line items (people, tools, marketing, operations). Examples for software: developers, designers, marketing staff, AI tools, LinkedIn ads, cloud hosting.
+
 Return JSON: {
   "averageTicketUs": number,
   "averageTicketIndia": number,
@@ -96,6 +99,7 @@ Return JSON: {
   "marketingSpend": number,
   "toolingSpend": number,
   "retentionRate": number (0-1),
+  "expenseLineItems": [{ "id": string, "name": string, "category": "people"|"tools"|"marketing"|"operations"|"other", "monthlyAmount": number, "headcount": number?, "unitCost": number?, "notes": string? }],
   "narrative": string,
   "leverageVariables": string[]
 }`;
