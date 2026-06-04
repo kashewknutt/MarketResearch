@@ -1,13 +1,18 @@
 import { formatMoney } from "@/lib/currency";
 import type {
   FinancialAssumptions,
+  FinancialMonthlyPlans,
   FinancialSnapshot,
   OnboardingProfile,
 } from "@/lib/types/domain";
 import { createProvenance } from "@/lib/db/provenance";
 import { sanitizeAssumptions } from "@/lib/research/assumption-bounds";
+import {
+  buildDefaultMonthlyPlans,
+  computeBothScenarios,
+  normalizeMonthlyPlans,
+} from "@/lib/research/financial-timeline-engine";
 import { migrateAssumptionsToLineItems } from "@/lib/research/expense-line-items";
-import { simulateServiceBusinessMonths } from "@/lib/research/service-projection-engine";
 
 export function defaultAssumptions(profile: OnboardingProfile): FinancialAssumptions {
   const months = Math.max(1, profile.goalMonths);
@@ -51,31 +56,35 @@ export function buildProjections(
   rawAssumptions: FinancialAssumptions,
   narrative = "",
   leverageVariables: string[] = [],
+  monthlyPlansInput?: FinancialMonthlyPlans,
 ): FinancialSnapshot {
   const months = Math.max(1, Math.min(50, profile.goalMonths));
   const defaults = defaultAssumptions(profile);
   const assumptions = sanitizeAssumptions(profile, rawAssumptions, defaults);
 
-  const { projections, finalRecurringMrr } = simulateServiceBusinessMonths(
+  const monthlyPlans = monthlyPlansInput
+    ? normalizeMonthlyPlans(profile, assumptions, monthlyPlansInput)
+    : buildDefaultMonthlyPlans(profile, assumptions);
+
+  const { conservative, ambitious, active } = computeBothScenarios(
     profile,
     assumptions,
-    months,
-    profile.businessName,
+    monthlyPlans,
   );
 
-  const gapToGoal = Math.round(profile.targetMrr - finalRecurringMrr);
+  const gapToGoal = Math.round(profile.targetMrr - active.finalMrr);
   const monthlyPaceRequired =
     months > 0
       ? Math.round((profile.targetMrr - profile.currentMrr) / months)
       : 0;
 
-  const base = projections.map((p) => p.recurringMrr ?? p.revenue);
   const scenarios = {
-    conservative: base.map((r) => Math.round(r * 0.85)),
-    base,
-    aggressive: base.map((r) => Math.round(Math.min(r * 1.15, profile.targetMrr * 1.05))),
+    conservative: conservative.mrrSeries,
+    base: active.mrrSeries,
+    aggressive: ambitious.mrrSeries,
   };
 
+  const projections = active.projections;
   const totalExpenses = projections.reduce((s, p) => s + p.expenses, 0);
   const items = assumptions.expenseLineItems ?? [];
   const categoryTotals = items.reduce(
@@ -98,6 +107,7 @@ export function buildProjections(
       value: assumptions,
       ...createProvenance("ai"),
     },
+    monthlyPlans,
     projections,
     scenarios,
     gapToGoal,
@@ -107,14 +117,14 @@ export function buildProjections(
       leverageVariables.length > 0
         ? leverageVariables
         : [
-            "Increase lead volume",
-            "Improve call-to-close rate",
-            "Land more mid-ticket and retainer deals",
-            "Reduce months with zero new cash",
+            "Grow recurring low-ticket clients each month",
+            "Schedule ~3 high-ticket deals per year in specific months",
+            "Plan rare whale deals in ambitious scenario",
+            "Tune monthly expense table to match hiring and ads",
           ],
     narrative:
       narrative ||
-      `Service-business model from ${formatMoney(profile.currentMrr, profile.currency)} starting MRR toward ${formatMoney(profile.targetMrr, profile.currency)} over ${months} months. Revenue is lumpy: mix of low-frequency small deals, mid-ticket projects, rare whales, and retainers—some months may show zero new cash while recurring MRR steps up gradually.`,
+      `Table-driven plan from ${formatMoney(profile.currentMrr, profile.currency)} toward ${formatMoney(profile.targetMrr, profile.currency)} over ${months} months. Edit monthly income (Conservative vs Ambitious) and expenses; MRR grows from recurring low-ticket adds plus lumpy high-ticket and whale cash.`,
     provenance: createProvenance("ai"),
   };
 }

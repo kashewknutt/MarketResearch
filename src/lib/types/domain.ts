@@ -173,6 +173,45 @@ export interface FinancialAssumptions {
   retainerMrrFraction?: number;
 }
 
+export type FinancialScenario = "conservative" | "ambitious";
+
+/** Global knobs used to seed monthly income tables. */
+export interface FinancialIncomeDrivers {
+  lowTicketClientsPerMonth: number;
+  lowTicketMrrEach: number;
+  highTicketsPerYear: number;
+  highTicketAmount: number;
+  whalesPerYear: number;
+  whaleAmount: number;
+  monthlyChurnRate: number;
+}
+
+export interface MonthlyExpenseRow {
+  month: number;
+  totalExpenses: number;
+  userEdited?: boolean;
+}
+
+export interface MonthlyIncomeRow {
+  month: number;
+  lowTicketClients: number;
+  lowTicketMrr: number;
+  highTicketCash: number;
+  whaleCash: number;
+  userEdited?: boolean;
+}
+
+export interface FinancialMonthlyPlans {
+  conservative: MonthlyIncomeRow[];
+  ambitious: MonthlyIncomeRow[];
+  expenses: MonthlyExpenseRow[];
+  activeScenario: FinancialScenario;
+  incomeDrivers?: {
+    conservative: FinancialIncomeDrivers;
+    ambitious: FinancialIncomeDrivers;
+  };
+}
+
 export interface MonthlyDealBreakdown {
   lowTicket: number;
   midTicket: number;
@@ -207,6 +246,7 @@ export interface MonthlyProjection {
 
 export interface FinancialSnapshot {
   assumptions: EditableValue<FinancialAssumptions>;
+  monthlyPlans?: FinancialMonthlyPlans;
   linkedInAdHistory?: LinkedInAdHistory;
   projections: MonthlyProjection[];
   scenarios: {
@@ -320,6 +360,7 @@ export interface DashboardMetrics {
   leadCount: number;
   activeProjects: number;
   mrrSeries: Array<{ month: number; mrr: number }>;
+  mrrScenarioLabel?: string;
   regionalDemandCounts: Record<string, number>;
 }
 

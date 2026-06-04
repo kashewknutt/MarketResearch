@@ -15,17 +15,29 @@ import {
   buildProjections,
   defaultAssumptions,
 } from "@/lib/research/projection-engine";
+import { normalizeMonthlyPlans } from "@/lib/research/financial-timeline-engine";
 import type {
   ExpenseLineItem,
   FinancialAssumptions,
+  FinancialIncomeDrivers,
+  FinancialMonthlyPlans,
   FinancialSnapshot,
+  MonthlyIncomeRow,
   OnboardingProfile,
 } from "@/lib/types/domain";
 
-type RawFinancial = FinancialAssumptions & {
+type RawFinancial = Partial<FinancialAssumptions> & {
   narrative: string;
   leverageVariables: string[];
   expenseLineItems?: ExpenseLineItem[];
+  incomeDrivers?: {
+    conservative?: FinancialIncomeDrivers;
+    ambitious?: FinancialIncomeDrivers;
+  };
+  monthlyPlans?: {
+    conservative?: MonthlyIncomeRow[];
+    ambitious?: MonthlyIncomeRow[];
+  };
 };
 
 export async function runFinancialModeling(
@@ -74,7 +86,25 @@ Return expenseLineItems array with id, name, category, monthlyAmount, optional h
   );
   merged = migrateAssumptionsToLineItems(merged, profile, defaults);
 
-  const snapshot = buildProjections(profile, merged, narrative, leverageVariables);
+  const monthlyPlans = normalizeMonthlyPlans(profile, merged, {
+    conservative: result.data.monthlyPlans?.conservative,
+    ambitious: result.data.monthlyPlans?.ambitious,
+    incomeDrivers: result.data.incomeDrivers
+      ? {
+          conservative: result.data.incomeDrivers.conservative!,
+          ambitious: result.data.incomeDrivers.ambitious!,
+        }
+      : undefined,
+    activeScenario: "ambitious",
+  } as Partial<FinancialMonthlyPlans>);
+
+  const snapshot = buildProjections(
+    profile,
+    merged,
+    narrative,
+    leverageVariables,
+    monthlyPlans,
+  );
   snapshot.linkedInAdHistory = linkedInAdHistory;
   snapshot.provenance = createProvenance("search", result.citations, 0.85);
   snapshot.assumptions = {

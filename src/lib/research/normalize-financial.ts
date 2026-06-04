@@ -18,10 +18,12 @@ export function normalizeFinancialSnapshot(
     migrated,
     snapshot.narrative,
     snapshot.leverageVariables,
+    snapshot.monthlyPlans,
   );
   return {
     ...rebuilt,
     linkedInAdHistory: snapshot.linkedInAdHistory ?? rebuilt.linkedInAdHistory,
+    monthlyPlans: rebuilt.monthlyPlans,
     assumptions: {
       ...snapshot.assumptions,
       value: migrated,

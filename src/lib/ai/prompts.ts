@@ -88,32 +88,18 @@ Currency: ${profile.currency}. Current MRR: ${formatMoney(profile.currentMrr, pr
 Estimate realistic monthly amounts for domain-specific expense line items (people, tools, marketing, operations). Examples for software: developers, designers, marketing staff, AI tools, LinkedIn ads, cloud hosting.
 
 Return JSON: {
-  "averageTicketUs": number,
-  "averageTicketIndia": number,
-  "closeRate": number (0-1),
-  "leadVolume": number,
-  "leadToCallRate": number (0-1),
-  "callToCloseRate": number (0-1),
-  "deliveryCapacity": number,
-  "hiringCost": number,
-  "hiringMonth": number,
-  "grossMarginTarget": number (0-1),
-  "marketingSpend": number,
-  "toolingSpend": number,
-  "retentionRate": number (0-1),
-  "dealMixLowFrequency": number (0-1),
-  "dealMixMidTicket": number (0-1),
-  "dealMixHighTicket": number (0-1),
-  "dealMixWhale": number (0-1),
-  "ticketLow": number,
-  "ticketMid": number,
-  "ticketHigh": number,
-  "ticketWhale": number,
-  "monthsWithZeroCashPct": number (0-0.4),
-  "retainerConversionRate": number (0-1),
-  "retainerMrrFraction": number (0-1),
   "expenseLineItems": [{ "id": string, "name": string, "category": "people"|"tools"|"marketing"|"operations"|"other", "monthlyAmount": number, "headcount": number?, "unitCost": number?, "notes": string? }],
-  "narrative": string (note lumpy service revenue, not smooth MRR ramp),
+  "incomeDrivers": {
+    "conservative": { "lowTicketClientsPerMonth": number, "lowTicketMrrEach": number, "highTicketsPerYear": 3, "highTicketAmount": number, "whalesPerYear": number, "whaleAmount": number, "monthlyChurnRate": number },
+    "ambitious": { same shape — higher clients and ticket sizes toward target MRR }
+  },
+  "monthlyPlans": {
+    "conservative": [{ "month": number (1..${profile.goalMonths}), "lowTicketClients": number, "lowTicketMrr": number, "highTicketCash": number (0 most months), "whaleCash": number (0 most months) }],
+    "ambitious": [ same for each month — ~3 high-ticket months per year, rare whale months ]
+  },
+  "narrative": string,
   "leverageVariables": string[]
-}`;
+}
+
+All amounts in ${profile.currency}. Conservative path should end near 50-60% of MRR gap; ambitious near 90-100% of target MRR by month ${profile.goalMonths}.`;
 }

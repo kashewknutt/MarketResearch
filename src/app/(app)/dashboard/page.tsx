@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import {
   Bar,
   BarChart,
@@ -33,7 +34,7 @@ export default function DashboardPage() {
   const [demandsByRegion, setDemandsByRegion] = useState<Record<string, DemandSignal[]>>({});
   const [projects, setProjects] = useState<MarketProject[]>([]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/dashboard")
       .then((r) => r.json())
       .then((d) => {
@@ -45,6 +46,12 @@ export default function DashboardPage() {
         setProjects(d.projects ?? []);
       });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAppRefresh(load, ["all"]);
 
   if (!profile || !metrics) {
     return <p className="text-sm text-slate-500">Loading dashboard…</p>;
@@ -92,7 +99,9 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-100 p-4">
-          <h2 className="mb-4 text-sm font-semibold text-slate-700">Planned MRR path</h2>
+          <h2 className="mb-4 text-sm font-semibold text-slate-700">
+            MRR path ({metrics.mrrScenarioLabel ?? "ambitious"})
+          </h2>
           <div className="h-56">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={metrics.mrrSeries}>

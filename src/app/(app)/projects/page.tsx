@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
@@ -16,7 +17,7 @@ export default function ProjectsPage() {
   const [filter, setFilter] = useState<string>("all");
   const [selected, setSelected] = useState<MarketProject | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/projects")
       .then((r) => r.json())
       .then((d) => {
@@ -24,6 +25,12 @@ export default function ProjectsPage() {
         setRegions(d.regions ?? []);
       });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAppRefresh(load, ["projects", "all"]);
 
   const filtered =
     filter === "all" ? projects : projects.filter((p) => p.region === filter);

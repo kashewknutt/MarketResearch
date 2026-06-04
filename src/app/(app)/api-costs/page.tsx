@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import type { ApiCostEventRecord } from "@/lib/ai/pricing-types";
 import type { ModelPricingRates } from "@/lib/ai/pricing-types";
 
@@ -47,22 +48,14 @@ export default function ApiCostsPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const res = await fetch("/api/costs?limit=200");
-      if (cancelled) return;
-      const json = await res.json();
-      setData(json);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void load(false, true);
+  }, [load]);
+
+  useAppRefresh(() => void load(true, false), ["api-costs", "all"]);
 
   const refreshPricing = async () => {
     setRefreshingPricing(true);
-    await load(true);
+    await load(true, false);
   };
 
   if (loading && !data) {

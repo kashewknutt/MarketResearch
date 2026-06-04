@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { EditableField } from "@/components/editable-field";
 import { ProjectCard } from "@/components/project-card";
@@ -10,7 +11,7 @@ export default function StrategyPage() {
   const [strategy, setStrategy] = useState<StrategySnapshot | null>(null);
   const [projects, setProjects] = useState<MarketProject[]>([]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/strategy")
       .then((r) => r.json())
       .then((d) => setStrategy(d.strategy));
@@ -18,6 +19,12 @@ export default function StrategyPage() {
       .then((r) => r.json())
       .then((d) => setProjects(d.projects ?? []));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAppRefresh(load, ["strategy", "all"]);
 
   const patch = async (updates: Partial<StrategySnapshot>) => {
     await fetch("/api/strategy", {

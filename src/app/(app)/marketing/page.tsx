@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { CitationList } from "@/components/ui/citation-list";
@@ -49,7 +50,7 @@ export default function MarketingPage() {
   const [currency, setCurrency] = useState("USD");
   const [selectedCampaign, setSelectedCampaign] = useState<MarketingItem | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/marketing")
       .then((r) => r.json())
       .then((d) => setMarketing(d.marketing));
@@ -60,6 +61,12 @@ export default function MarketingPage() {
       .then((r) => r.json())
       .then((d) => setCurrency(d.profile?.currency ?? "USD"));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAppRefresh(load, ["marketing", "all"]);
 
   if (!marketing) {
     return (

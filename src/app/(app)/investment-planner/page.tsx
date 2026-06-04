@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { EditableField } from "@/components/editable-field";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { currencyInputPrefix, formatMoney } from "@/lib/currency";
@@ -10,7 +11,7 @@ export default function InvestmentPlannerPage() {
   const [investment, setInvestment] = useState<InvestmentSnapshot | null>(null);
   const [profile, setProfile] = useState<OnboardingProfile | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/investment")
       .then((r) => r.json())
       .then((d) => {
@@ -18,6 +19,12 @@ export default function InvestmentPlannerPage() {
         setProfile(d.profile ?? null);
       });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAppRefresh(load, ["investment", "all"]);
 
   const patchAllocation = async (
     index: number,

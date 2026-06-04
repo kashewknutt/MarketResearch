@@ -28,14 +28,24 @@ export async function GET() {
   const competitors = await getSnapshot<CompetitorSnapshot>("competitors");
   const leads = await getAllLeads();
 
-  const projections = financial
-    ? buildProjections(profile, financial.assumptions.value).projections
-    : buildProjections(profile, defaultAssumptions(profile)).projections;
+  const built = financial
+    ? buildProjections(
+        profile,
+        financial.assumptions.value,
+        financial.narrative,
+        financial.leverageVariables,
+        financial.monthlyPlans,
+      )
+    : buildProjections(profile, defaultAssumptions(profile));
+
+  const projections = built.projections;
+  const scenarioLabel = built.monthlyPlans?.activeScenario ?? "ambitious";
 
   const metrics: DashboardMetrics = {
     currentMrr: profile.currentMrr,
     targetMrr: profile.targetMrr,
-    gapToGoal: financial?.gapToGoal ?? profile.targetMrr - profile.currentMrr,
+    gapToGoal: built.gapToGoal,
+    mrrScenarioLabel: scenarioLabel,
     currency: profile.currency,
     leadCount: leads.length,
     activeProjects: projects.length,

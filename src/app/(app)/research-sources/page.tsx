@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 
 interface Citation {
   title: string;
@@ -18,7 +19,7 @@ export default function ResearchSourcesPage() {
   const [citations, setCitations] = useState<Citation[]>([]);
   const [logs, setLogs] = useState<AiLog[]>([]);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch("/api/sources")
       .then((r) => r.json())
       .then((d) => {
@@ -26,6 +27,12 @@ export default function ResearchSourcesPage() {
         setLogs(d.logs ?? []);
       });
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useAppRefresh(load, ["sources", "all"]);
 
   return (
     <div className="space-y-8">

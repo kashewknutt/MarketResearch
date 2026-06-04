@@ -1,5 +1,5 @@
 import { buildProjections, defaultAssumptions } from "../projection-engine";
-import { simulateServiceBusinessMonths } from "../service-projection-engine";
+import { computeBothScenarios } from "../financial-timeline-engine";
 import type { OnboardingProfile } from "@/lib/types/domain";
 
 function run(profile: OnboardingProfile) {
@@ -41,48 +41,62 @@ function assert(cond: boolean, msg: string) {
 
 const snap = run(usProfile);
 assert(snap.projections.length === 12, `Expected 12 months, got ${snap.projections.length}`);
-assert(typeof snap.gapToGoal === "number", "gapToGoal should be a number");
-assert(Math.abs(snap.gapToGoal) <= usProfile.targetMrr, `gap too large: ${snap.gapToGoal}`);
+assert(snap.monthlyPlans != null, "monthlyPlans should exist");
 assert(
-  snap.projections.every((p) => p.revenue <= usProfile.targetMrr * 1.05),
-  "MRR should not far exceed target",
+  snap.monthlyPlans!.expenses.length === 12,
+  `expense table length ${snap.monthlyPlans!.expenses.length}`,
 );
 assert(
-  snap.projections.some((p) => p.cashCollected != null),
-  "service model should set cashCollected",
+  snap.monthlyPlans!.conservative.length === 12,
+  "conservative income table length",
 );
-const zeroCashMonths = snap.projections.filter((p) => (p.cashCollected ?? -1) === 0);
-assert(zeroCashMonths.length >= 0, "zero cash months possible");
+assert(
+  snap.monthlyPlans!.ambitious.length === 12,
+  "ambitious income table length",
+);
 
-const revenues = snap.projections.map((p) => p.revenue);
-const allSameDelta =
-  revenues.length > 2 &&
-  revenues.slice(1).every((r, i) => r - revenues[i]! === revenues[1]! - revenues[0]!);
-assert(!allSameDelta, "MRR series should not be perfectly linear");
+const { conservative, ambitious } = computeBothScenarios(
+  usProfile,
+  snap.assumptions.value,
+  snap.monthlyPlans!,
+);
+assert(
+  ambitious.finalMrr > conservative.finalMrr,
+  `ambitious ${ambitious.finalMrr} should exceed conservative ${conservative.finalMrr}`,
+);
+assert(
+  ambitious.finalMrr >= usProfile.targetMrr * 0.7,
+  `ambitious end MRR ${ambitious.finalMrr} below 70% of target`,
+);
+assert(
+  ambitious.finalMrr <= usProfile.targetMrr * 1.15,
+  `ambitious end MRR ${ambitious.finalMrr} too high`,
+);
+
+const highMonths = snap.monthlyPlans!.ambitious.filter((r) => r.highTicketCash > 0);
+assert(highMonths.length >= 2, "should have high-ticket months in ambitious plan");
+
+const lowMrrMonths = snap.projections.filter((p) => (p.cashCollected ?? 0) > 0);
+assert(lowMrrMonths.length >= 8, "most months should have cash in");
+
+assert(
+  snap.scenarios.conservative.length === 12 &&
+    snap.scenarios.aggressive.length === 12,
+  "scenario series length",
+);
+assert(
+  snap.scenarios.aggressive[snap.scenarios.aggressive.length - 1]! >
+    snap.scenarios.conservative[snap.scenarios.conservative.length - 1]!,
+  "aggressive series should end above conservative",
+);
 
 const inrSnap = run(inrProfile);
 assert(inrSnap.projections.length === 40, "INR 40-month horizon");
-const maxMrr = Math.max(...inrSnap.projections.map((p) => p.revenue));
-assert(maxMrr <= inrProfile.targetMrr * 1.05, `INR MRR exploded: ${maxMrr}`);
-assert(Number.isFinite(inrSnap.gapToGoal), "gap must be finite");
-assert(
-  Math.abs(inrSnap.gapToGoal) < 1e9,
-  `gap astronomical: ${inrSnap.gapToGoal}`,
-);
-
-const last = inrSnap.projections[inrSnap.projections.length - 1]!;
-assert(last.expenses > 0, "expenses should be positive");
-
-const forcedZero = simulateServiceBusinessMonths(
-  usProfile,
-  { ...defaultAssumptions(usProfile), monthsWithZeroCashPct: 0.99, leadVolume: 20 },
-  12,
-  "zero-cash-test",
-);
-assert(
-  forcedZero.projections.some((p) => p.cashCollected === 0),
-  "high zero-cash pct should produce zero-cash months",
-);
+const inrEnd =
+  inrSnap.projections[inrSnap.projections.length - 1]!.recurringMrr ??
+  inrSnap.projections[inrSnap.projections.length - 1]!.revenue;
+assert(inrEnd > inrProfile.currentMrr, `INR should grow: ${inrEnd}`);
+assert(inrEnd >= inrProfile.targetMrr * 0.5, `INR end ${inrEnd} too low`);
 
 if (failed === 0) {
   console.log("projection-engine.test.ts: OK");
