@@ -1,0 +1,102 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { EditableField } from "@/components/editable-field";
+import { GeminiFallback } from "@/components/gemini-fallback";
+import type { InvestmentSnapshot } from "@/lib/types/domain";
+
+export default function InvestmentPlannerPage() {
+  const [investment, setInvestment] = useState<InvestmentSnapshot | null>(null);
+
+  useEffect(() => {
+    fetch("/api/investment")
+      .then((r) => r.json())
+      .then((d) => setInvestment(d.investment));
+  }, []);
+
+  const patchAllocation = async (
+    index: number,
+    field: string,
+    value: string | number,
+  ) => {
+    if (!investment) return;
+    const allocations = [...investment.allocations];
+    allocations[index] = {
+      ...allocations[index],
+      [field]: value,
+      provenance: {
+        ...allocations[index].provenance,
+        source: "user",
+        isUserEdited: true,
+      },
+    };
+    await fetch("/api/investment", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allocations }),
+    });
+    const res = await fetch("/api/investment");
+    const d = await res.json();
+    setInvestment(d.investment);
+  };
+
+  if (!investment) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-slate-800">Investment Planner</h1>
+        <GeminiFallback title="Run research to generate investment plan" verify />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <header>
+        <h1 className="text-2xl font-semibold text-slate-800">Investment Planner</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Where to put money, why it matters, and expected outcomes.
+        </p>
+        <p className="mt-4 text-2xl font-semibold text-violet-700">
+          ${investment.totalRecommended.toLocaleString()} recommended
+        </p>
+      </header>
+
+      <div className="space-y-4">
+        {investment.allocations.map((a, i) => (
+          <div
+            key={a.category}
+            className="rounded-xl border border-slate-100 bg-gradient-to-r from-white to-violet-50/20 p-5"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 className="text-base font-semibold text-slate-800">{a.category}</h3>
+              <span className="text-sm font-medium text-slate-600">
+                ${a.amount.toLocaleString()} ({a.percentage}%)
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <EditableField
+                label="Amount"
+                value={a.amount}
+                type="number"
+                prefix="$"
+                onSave={(v) => patchAllocation(i, "amount", Number(v))}
+              />
+              <EditableField
+                label="Percentage"
+                value={a.percentage}
+                type="number"
+                onSave={(v) => patchAllocation(i, "percentage", Number(v))}
+              />
+            </div>
+            <p className="mt-3 text-xs text-slate-600">
+              <strong className="text-slate-700">Why:</strong> {a.rationale}
+            </p>
+            <p className="mt-1 text-xs text-emerald-700">
+              <strong>Expected:</strong> {a.expectedOutcome}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,15 @@
+appId: com.marketresearch.app
+productName: Market Research
+directories:
+  output: dist-electron
+files:
+  - "!.next/cache/**"
+  - "electron/**"
+  - ".next/standalone/**"
+  - ".next/static/**"
+  - "public/**"
+  - "package.json"
+mac:
+  category: public.app-category.business
+win:
+  target: nsis

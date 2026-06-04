@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Market Research Platform
 
-## Getting Started
+Desktop-first Next.js app for real-time market research tailored to service-based companies. Uses local SQLite storage, Gemini 3 Flash with **Grounding with Google Search** (via `GEMINI_API_KEY` only), and editable AI-generated insights.
 
-First, run the development server:
+**Not used:** Google Custom Search API, Search Console API, OAuth 2.0 clients, or service accounts for search — those are separate products with different auth.
+
+## Quick start
+
+### Web development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
+# Required: GEMINI_API_KEY for all AI research (no mock data)
+
+npm install
+npm run dev:data
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). You will land on **System requirements** first — all checks must pass (API key, Gemini, Google Search, billing, local storage) before onboarding.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Desktop (Electron)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run electron:dev
+```
 
-## Learn More
+Data is stored in `./data` during development.
 
-To learn more about Next.js, take a look at the following resources:
+## Environment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Description |
+|----------|-------------|
+| `GEMINI_API_KEY` | **Required.** Google Gemini API key (server-side only) |
+| `MARKET_RESEARCH_DATA_DIR` | Override local data folder (set automatically by Electron) |
+| `GEMINI_BILLING_TIER` | `paid` (default) or `free` — controls cost estimates in API Costs |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Features
 
-## Deploy on Vercel
+- **System requirements** — Pre-flight checks for Gemini API, Google Search grounding, billing/quota, and local storage
+- **Onboarding** — Business profile, regions (default US + India), MRR, goal revenue (1–50 months)
+- **Dashboard** — Top 10 demands per region, active projects with ticket sizes
+- **Projects** — 10 active projects per region; mark done → AI fetches 1 replacement
+- **Financial Analysis** — Projections, assumptions, investment breakdown (all editable)
+- **Marketing** — Positioning, channels, offers tied to research
+- **Strategy** — ICP, region comparison, priorities
+- **Investment Planner** — Where to spend and expected outcomes
+- **Research Sources** — Citations and AI logs
+- **API Costs** — Traceable per-call costs (setup tests, research, projects) with live pricing from Google
+- **Settings** — Edit profile, re-run research
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run dev` — Next.js dev server
+- `npm run dev:data` — Dev with `./data` persistence
+- `npm run electron:dev` — Electron + Next.js on port 3847
+- `npm run build` — Production build (standalone)
+- `npm run test:projection` — Projection engine smoke test
+
+## Tech stack
+
+- Next.js 16 (App Router) + TypeScript
+- Electron (desktop packaging)
+- SQLite + Drizzle ORM
+- Gemini 3 Flash (`gemini-3-flash-preview`) with Google Search grounding
+- Tailwind CSS 4

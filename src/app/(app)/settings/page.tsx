@@ -1,0 +1,226 @@
+"use client";
+
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { GeminiFallback } from "@/components/gemini-fallback";
+import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
+import type { GeminiConnectionStatus } from "@/lib/ai/gemini";
+
+function SettingsContent() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [profile, setProfile] = useState<OnboardingProfile | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [researchError, setResearchError] = useState<string | null>(null);
+  const [geminiStatus, setGeminiStatus] = useState<GeminiConnectionStatus | null>(
+    null,
+  );
+  const [geminiMessage, setGeminiMessage] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((d) => setProfile(d.profile));
+    fetch("/api/status?verify=true")
+      .then((r) => r.json())
+      .then((d) => {
+        setGeminiStatus(d.gemini?.status ?? null);
+        setGeminiMessage(d.gemini?.message ?? "");
+      });
+  }, []);
+
+  const save = async () => {
+    if (!profile) return;
+    setSaving(true);
+    await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profile),
+    });
+    setSaving(false);
+  };
+
+  const rerunResearch = async () => {
+    setResearchError(null);
+    setSaving(true);
+    const res = await fetch("/api/research/start", { method: "POST" });
+    const data = await res.json();
+    setSaving(false);
+
+    if (!res.ok) {
+      setResearchError(data.message ?? "Research could not start.");
+      return;
+    }
+
+    router.push(`/loading?jobId=${data.job.id}`);
+  };
+
+  const resetOnboarding = () => router.push("/onboarding");
+
+  const recheckRequirements = async () => {
+    await fetch("/api/setup/reset", { method: "POST" });
+    router.push("/setup");
+  };
+
+  if (!profile) {
+    return <p className="text-sm text-slate-500">Loading settings…</p>;
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-8">
+      <header>
+        <h1 className="text-2xl font-semibold text-slate-800">Settings</h1>
+        {params.get("error") === "research" && (
+          <p className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            Research did not complete. Review the Gemini API status below and try again.
+          </p>
+        )}
+      </header>
+
+      <GeminiFallback title="Gemini API required for research" verify />
+
+      <section className="rounded-xl border border-slate-100 p-5">
+        <h2 className="text-sm font-semibold text-slate-700">API status</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          {geminiStatus === "ready"
+            ? "Connected — research and project generation are available."
+            : geminiMessage || "Checking API status…"}
+        </p>
+        {researchError && (
+          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {researchError}
+          </p>
+        )}
+      </section>
+
+      <section className="space-y-4 rounded-xl border border-slate-100 p-5">
+        <h2 className="text-sm font-semibold text-slate-700">Business profile</h2>
+        {(
+          [
+            ["businessName", "Business name"],
+            ["website", "Website"],
+            ["serviceDomain", "Service domain"],
+            ["targetAudience", "Target audience"],
+          ] as const
+        ).map(([key, label]) => (
+          <div key={key}>
+            <label className="text-xs text-slate-500">{label}</label>
+            <input
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={profile[key]}
+              onChange={(e) =>
+                setProfile({ ...profile, [key]: e.target.value })
+              }
+            />
+          </div>
+        ))}
+        <div>
+          <label className="text-xs text-slate-500">Regions</label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {profile.regions.map((r) => (
+              <span key={r} className="rounded-full bg-sky-50 px-3 py-1 text-xs">
+                {r}
+              </span>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="mt-2 text-xs text-sky-600"
+            onClick={() =>
+              setProfile({
+                ...profile,
+                regions: [...DEFAULT_REGIONS] as RegionCode[],
+              })
+            }
+          >
+            Reset to US + India
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-xs text-slate-500">Current MRR ($)</label>
+            <input
+              type="number"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={profile.currentMrr}
+              onChange={(e) =>
+                setProfile({ ...profile, currentMrr: Number(e.target.value) })
+              }
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Goal revenue ($)</label>
+            <input
+              type="number"
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              value={profile.goalRevenue}
+              onChange={(e) =>
+                setProfile({ ...profile, goalRevenue: Number(e.target.value) })
+              }
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-slate-500">
+            Goal months (max 50): {profile.goalMonths}
+          </label>
+          <input
+            type="range"
+            min={1}
+            max={50}
+            value={profile.goalMonths}
+            onChange={(e) =>
+              setProfile({ ...profile, goalMonths: Number(e.target.value) })
+            }
+            className="mt-2 w-full"
+          />
+        </div>
+      </section>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving}
+          className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-white disabled:opacity-50"
+        >
+          Save changes
+        </button>
+        <button
+          type="button"
+          onClick={() => void rerunResearch()}
+          disabled={saving || geminiStatus !== "ready"}
+          className="rounded-lg bg-violet-500 px-4 py-2 text-sm text-white disabled:opacity-50"
+        >
+          Re-run research
+        </button>
+        <button
+          type="button"
+          onClick={resetOnboarding}
+          className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600"
+        >
+          Edit onboarding flow
+        </button>
+        <button
+          type="button"
+          onClick={() => void recheckRequirements()}
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+        >
+          Re-run requirement checks
+        </button>
+      </div>
+
+      <p className="text-xs text-slate-400">
+        All data is stored locally. Market research requires a valid Gemini API key.
+      </p>
+    </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense>
+      <SettingsContent />
+    </Suspense>
+  );
+}
