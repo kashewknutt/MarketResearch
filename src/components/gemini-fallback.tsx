@@ -25,6 +25,7 @@ const STATUS_LABELS: Record<GeminiConnectionStatus, string> = {
   expired_key: "API key expired",
   rate_limited: "Rate limited",
   billing_required: "Billing required",
+  credits_depleted: "Prepaid credits used up",
   unavailable: "Unavailable",
 };
 

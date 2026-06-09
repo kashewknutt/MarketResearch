@@ -39,6 +39,7 @@ export type GeminiConnectionStatus =
   | "expired_key"
   | "rate_limited"
   | "billing_required"
+  | "credits_depleted"
   | "unavailable";
 
 export interface GeminiStatusPayload {
@@ -198,6 +199,8 @@ function mapCodeToStatus(
       return "rate_limited";
     case "billing_required":
       return "billing_required";
+    case "credits_depleted":
+      return "credits_depleted";
     default:
       return "unavailable";
   }

@@ -215,10 +215,16 @@ async function checkBillingQuota(): Promise<RequirementCheckResult> {
 
   const billingSignals = [search.message, api.message].join(" ").toLowerCase();
   const billingIssue =
-    billingSignals.includes("billing") ||
-    billingSignals.includes("quota") ||
-    billingSignals.includes("payment") ||
-    api.status === "billing_required" ||
+    billingSignals.includes("billing must be") ||
+    billingSignals.includes("billing account") ||
+    billingSignals.includes("billing not enabled") ||
+    api.status === "billing_required";
+
+  const creditsIssue =
+    billingSignals.includes("prepaid") ||
+    billingSignals.includes("prepayment") ||
+    billingSignals.includes("credit") ||
+    api.status === "credits_depleted" ||
     api.status === "rate_limited";
 
   if (api.status === "ready" && search.ok) {
@@ -235,13 +241,28 @@ async function checkBillingQuota(): Promise<RequirementCheckResult> {
     );
   }
 
+  if (creditsIssue) {
+    return check(
+      "billing_quota",
+      "Billing & quota",
+      "Google Search grounding on Gemini 3 requires an active billing account (usage-based).",
+      false,
+      api.message || search.message,
+      {
+        actionLabel: "Manage credits in AI Studio",
+        actionUrl: LINKS.aiStudio,
+        detail: search.ok ? api.message : search.message,
+      },
+    );
+  }
+
   if (billingIssue) {
     return check(
       "billing_quota",
       "Billing & quota",
       "Google Search grounding on Gemini 3 requires an active billing account (usage-based).",
       false,
-      "Billing or quota may not be enabled on the Google Cloud project linked to your Gemini API key. Enable the Generative Language API and paid-tier grounding — you do not need Custom Search or Search Console OAuth.",
+      "Billing may not be enabled on the Google Cloud project linked to your Gemini API key. Enable the Generative Language API and paid-tier grounding — you do not need Custom Search or Search Console OAuth.",
       {
         actionLabel: "Enable billing in GCP",
         actionUrl: LINKS.gcpBilling,

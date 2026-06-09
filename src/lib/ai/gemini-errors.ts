@@ -4,6 +4,7 @@ export type GeminiErrorCode =
   | "expired_key"
   | "rate_limited"
   | "billing_required"
+  | "credits_depleted"
   | "parse_error"
   | "unavailable";
 
@@ -69,26 +70,43 @@ export function classifyGeminiError(err: unknown): GeminiApiError {
   }
 
   if (
-    lower.includes("billing") ||
-    lower.includes("payment") ||
-    lower.includes("enable billing") ||
-    lower.includes("quota exceeded") ||
-    lower.includes("resource_exhausted") ||
-    lower.includes("insufficient") ||
-    lower.includes("precondition") ||
-    (lower.includes("quota") && lower.includes("exceed"))
+    lower.includes("prepayment") ||
+    lower.includes("prepaid") ||
+    (lower.includes("credit") &&
+      (lower.includes("deplet") ||
+        lower.includes("exhaust") ||
+        lower.includes("insufficient")))
   ) {
     return new GeminiApiError(
-      "billing_required",
-      "Billing or quota must be enabled for Gemini and Google Search grounding. Link a paid Cloud billing account in Google Cloud Console or Google AI Studio, then retry.",
+      "credits_depleted",
+      "Your Gemini prepaid credits are used up. Add funds in Google AI Studio (Projects → Billing) or switch to pay-as-you-go, then retry.",
       message,
     );
   }
 
-  if (lower.includes("429") || lower.includes("quota") || lower.includes("rate")) {
+  if (
+    lower.includes("enable billing") ||
+    lower.includes("billing account") ||
+    lower.includes("billing must be") ||
+    lower.includes("billing is not") ||
+    lower.includes("billing not enabled")
+  ) {
+    return new GeminiApiError(
+      "billing_required",
+      "Billing must be enabled for Gemini and Google Search grounding. Link a paid Cloud billing account in Google Cloud Console or Google AI Studio, then retry.",
+      message,
+    );
+  }
+
+  if (
+    lower.includes("429") ||
+    lower.includes("quota") ||
+    lower.includes("rate") ||
+    lower.includes("resource_exhausted")
+  ) {
     return new GeminiApiError(
       "rate_limited",
-      "Gemini rate limit reached. Wait a moment and try again.",
+      "Gemini rate limit or quota reached. Wait a moment, check usage in AI Studio, and try again.",
       message,
     );
   }
