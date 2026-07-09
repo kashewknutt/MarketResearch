@@ -61,7 +61,7 @@ ${focusLine}
 
 Tasks:
 1. Research ${supportingExampleCount} additional real, currently-trending ad/content examples (use search grounding) to serve as fresh sources — these become "newExamples".
-2. Generate exactly ${cappedCount} new "newIdeas" — concrete, actionable video/post/reel/meme ideas tailored to ${profile.businessName}, distinct from the existing titles above. Every idea MUST include a "sourceRef" pointing at one of the "newExamples" you just researched (reuse its exact "id" as "exampleId" plus copy its title/url/platform/brandName/engagementSignal) and a concrete "whyPicked". If none fit, set "exampleId" to "" and explain the general trend in "whyPicked" instead.
+2. Generate exactly ${cappedCount} new "newIdeas" — concrete, actionable video/post/reel/meme ideas tailored to ${profile.businessName}, distinct from the existing titles above. **The user needs FAST, cheap-to-produce 30-second ads, not long-form video** — heavily favor "reel", "short", "static_post", "story", "meme", and "ad_creative" formats; only use "long_video" or "carousel" rarely (at most 1-2 in 10) and only when truly necessary. Every "concept" and "scriptOrCaption" must be written assuming a ~30 second runtime — one hook, one point, one call to action. Every idea MUST include a "sourceRef" pointing at one of the "newExamples" you just researched (reuse its exact "id" as "exampleId" plus copy its title/url/platform/brandName/engagementSignal) and a concrete "whyPicked". If none fit, set "exampleId" to "" and explain the general trend in "whyPicked" instead.
 
 Return JSON:
 {

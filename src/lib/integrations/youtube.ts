@@ -9,8 +9,19 @@ export interface YoutubeVideoSignal {
   viewCount?: number;
   likeCount?: number;
   commentCount?: number;
+  /** Real duration in seconds, parsed from contentDetails.duration (ISO 8601). */
+  durationSeconds?: number;
   thumbnailUrl?: string;
   url: string;
+}
+
+/** Parses an ISO 8601 duration (e.g. "PT1M30S") into whole seconds. */
+function parseIso8601Duration(iso?: string): number | undefined {
+  if (!iso) return undefined;
+  const match = iso.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
+  if (!match) return undefined;
+  const [, h, m, s] = match;
+  return (Number(h ?? 0) * 3600) + (Number(m ?? 0) * 60) + Number(s ?? 0);
 }
 
 export function youtubeEnvPresence(): boolean {
@@ -69,6 +80,7 @@ interface YtSearchItem {
 interface YtVideoStatsItem {
   id: string;
   statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
+  contentDetails?: { duration?: string };
 }
 
 async function ytFetch(path: string, params: Record<string, string>) {
@@ -93,6 +105,7 @@ function toSignal(item: YtSearchItem, stats?: YtVideoStatsItem): YoutubeVideoSig
     viewCount: stats?.statistics?.viewCount ? Number(stats.statistics.viewCount) : undefined,
     likeCount: stats?.statistics?.likeCount ? Number(stats.statistics.likeCount) : undefined,
     commentCount: stats?.statistics?.commentCount ? Number(stats.statistics.commentCount) : undefined,
+    durationSeconds: parseIso8601Duration(stats?.contentDetails?.duration),
     thumbnailUrl: item.snippet.thumbnails?.medium?.url,
     url: `https://www.youtube.com/watch?v=${videoId}`,
   };
@@ -103,7 +116,7 @@ async function withStats(items: YtSearchItem[]): Promise<YoutubeVideoSignal[]> {
   if (videoIds.length === 0) return [];
 
   const statsRes = await ytFetch("videos", {
-    part: "statistics",
+    part: "statistics,contentDetails",
     id: videoIds.join(","),
   }).catch(() => ({ items: [] as YtVideoStatsItem[] }));
   const statsById = new Map<string, YtVideoStatsItem>(

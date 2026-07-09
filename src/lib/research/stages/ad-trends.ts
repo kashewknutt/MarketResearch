@@ -72,6 +72,12 @@ function formatEngagementSignal(metrics: EngagementMetrics): string {
   return parts.join(" · ") || "Engagement data unavailable";
 }
 
+/** Classifies by real duration (contentDetails.duration) — never guesses "long_video" blind. */
+function classifyYoutubeFormat(v: YoutubeVideoSignal): "short" | "long_video" {
+  if (v.durationSeconds != null) return v.durationSeconds <= 60 ? "short" : "long_video";
+  return "long_video";
+}
+
 function youtubeToExample(v: YoutubeVideoSignal, isOwnBrand: boolean): TrendingAdExample {
   const metrics: EngagementMetrics = {
     viewCount: v.viewCount,
@@ -83,7 +89,7 @@ function youtubeToExample(v: YoutubeVideoSignal, isOwnBrand: boolean): TrendingA
     platform: "YouTube",
     brandName: v.channelTitle || (isOwnBrand ? "Your brand" : "Unknown"),
     isOwnBrand,
-    format: "long_video",
+    format: classifyYoutubeFormat(v),
     title: v.title,
     description: v.description.slice(0, 300),
     whyTrending: "",
@@ -158,6 +164,22 @@ async function getYoutubeSignals(query: string, isChannelSearch: boolean): Promi
   return [];
 }
 
+/**
+ * Hashtag/keyword-based "market" discovery surfaces recent posts, not curated top posts,
+ * so it's noisy — this keeps only the highest-engagement results from a larger raw fetch
+ * instead of trusting whatever a generic tag returns at face value.
+ */
+function topByEngagement<T extends { likeCount?: number; commentCount?: number }>(
+  items: T[],
+  limit: number,
+): T[] {
+  return [...items]
+    .sort(
+      (a, b) => (b.likeCount ?? 0) + (b.commentCount ?? 0) - ((a.likeCount ?? 0) + (a.commentCount ?? 0)),
+    )
+    .slice(0, limit);
+}
+
 function extractInstagramUsername(url?: string): string | undefined {
   if (!url) return undefined;
   return url.match(/instagram\.com\/([^/?]+)/i)?.[1];
@@ -229,9 +251,15 @@ export async function runAdTrends(
 
   const ownInstagramHandle = extractInstagramUsername(resolveOwnSocialUrl(profile, /instagram/i));
   const ownLinkedinUrl = resolveOwnSocialUrl(profile, /linkedin/i);
+  // A compound, multi-word tag is far more specific/relevant than a single generic word —
+  // a single word like "software" returns near-random recent posts from unrelated accounts.
   const hashtagGuess =
-    profile.serviceDomain.split(/\s+/)[0]?.replace(/[^a-zA-Z0-9]/g, "") ||
-    profile.businessName.replace(/[^a-zA-Z0-9]/g, "");
+    profile.serviceDomain
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .split(/\s+/)
+      .slice(0, 3)
+      .join("")
+      .toLowerCase() || profile.businessName.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
   const marketKeyword = `${profile.serviceDomain} ${profile.targetAudience}`;
 
   const [ownYoutube, marketYoutube, ...competitorYoutube] = await runWithConcurrency(
@@ -243,10 +271,10 @@ export async function runAdTrends(
     4,
   );
 
-  const [ownInstagram, marketInstagram, ...competitorInstagram] = await runWithConcurrency(
+  const [ownInstagram, marketInstagramRaw, ...competitorInstagram] = await runWithConcurrency(
     [
       () => (ownInstagramHandle ? fetchInstagramProfilePosts(ownInstagramHandle) : Promise.resolve([])),
-      () => fetchInstagramHashtagPosts(hashtagGuess),
+      () => fetchInstagramHashtagPosts(hashtagGuess, 24),
       ...trackedCompetitors.map((name) => {
         const handle = handleFor(name)?.instagramHandle;
         return () => (handle ? fetchInstagramProfilePosts(handle) : Promise.resolve([]));
@@ -254,12 +282,13 @@ export async function runAdTrends(
     ],
     4,
   );
+  const marketInstagram = topByEngagement(marketInstagramRaw, 8);
 
-  const [ownLinkedin, marketLinkedin, ...competitorLinkedin] = await runWithConcurrency(
+  const [ownLinkedin, marketLinkedinRaw, ...competitorLinkedin] = await runWithConcurrency(
     [
       () =>
         ownLinkedinUrl ? fetchLinkedInAuthorPosts(ownLinkedinUrl, profile.businessName) : Promise.resolve([]),
-      () => fetchLinkedInKeywordPosts(marketKeyword),
+      () => fetchLinkedInKeywordPosts(marketKeyword, 16),
       ...trackedCompetitors.map((name) => {
         const url = handleFor(name)?.linkedinUrl;
         return () => (url ? fetchLinkedInAuthorPosts(url, name) : Promise.resolve([]));
@@ -267,6 +296,7 @@ export async function runAdTrends(
     ],
     4,
   );
+  const marketLinkedin = topByEngagement(marketLinkedinRaw, 8);
 
   const realTrendingExamples: TrendingAdExample[] = [
     ...ownYoutube.map((v) => youtubeToExample(v, true)),
@@ -321,7 +351,7 @@ Tasks:
 1. Build "trendingNow": include every real example above (same id, enriched with format/whyTrending/hook), plus additional AI-researched examples (search grounding) to reach at least 15 total — those get "sourceType": "ai_estimate" and no "metrics".
 2. Group competitor-specific findings into "competitorActivity", one entry per tracked competitor name (include their real examples above under that name, enriched) plus any other relevant brand you find. Include at least 5 examples per competitor where evidence exists (real or AI-estimated).
 3. Identify brand/account names relevant to this market that are NOT in the tracked competitor list and flag them as "discoveredCompetitors".
-4. Generate "ideasForYou": at least 20 concrete, actionable ideas tailored to ${profile.businessName}, spanning a spread of formats (reel/short/meme/static_post/carousel/long_video/story/ad_creative) and priorities — do not concentrate on one format. Every idea MUST include a "sourceRef" pointing at one specific entry from "trendingNow" or a competitor's "examples" (reuse its exact "id" as "exampleId", plus copy its title/url/platform/brandName/engagementSignal) and a concrete "whyPicked" explaining exactly why that example justifies this idea. Prefer real ("scraped") sources over ai_estimate ones when both fit. If genuinely no single example inspired it, set "exampleId" to "" and explain in "whyPicked" what general trend justifies it instead — never leave "whyPicked" generic or empty.
+4. Generate "ideasForYou": at least 20 concrete, actionable ideas tailored to ${profile.businessName}. **The user needs FAST, cheap-to-produce 30-second ads, not long-form video** — heavily favor "reel", "short", "static_post", "story", "meme", and "ad_creative" formats. Only suggest "long_video" or "carousel" rarely, and only when the concept genuinely cannot work as a quick 30-second piece (e.g. a detailed case study) — aim for at most 1-2 out of every 10 ideas in those two formats combined, the rest must be quick-hit formats. Every "concept" and "scriptOrCaption" must be written assuming a ~30 second runtime (a single hook + one clear point + one call to action — not a multi-scene narrative). Every idea MUST include a "sourceRef" pointing at one specific entry from "trendingNow" or a competitor's "examples" (reuse its exact "id" as "exampleId", plus copy its title/url/platform/brandName/engagementSignal) and a concrete "whyPicked" explaining exactly why that example justifies this idea. Prefer real ("scraped") sources over ai_estimate ones when both fit. If genuinely no single example inspired it, set "exampleId" to "" and explain in "whyPicked" what general trend justifies it instead — never leave "whyPicked" generic or empty.
 
 Return JSON:
 {

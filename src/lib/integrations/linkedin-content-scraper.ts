@@ -66,6 +66,7 @@ export async function fetchLinkedInAuthorPosts(
     authorUrls: [profileOrCompanyUrl],
     searchQueries: [fallbackQuery],
     maxPosts: limit,
+    sortBy: "relevance",
   });
   return items.map(normalize).filter((p): p is LinkedInPostSignal => p !== null);
 }
@@ -79,6 +80,7 @@ export async function fetchLinkedInKeywordPosts(
   const items = await runApifyActor<RawLinkedInItem>(ACTOR_ID, {
     searchQueries: [query],
     maxPosts: limit,
+    sortBy: "relevance",
   });
   return items.map(normalize).filter((p): p is LinkedInPostSignal => p !== null);
 }
