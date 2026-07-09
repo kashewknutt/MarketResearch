@@ -166,6 +166,16 @@ export const trendingAdExampleSchema = z.object({
   citations: z.array(citationSchema),
 });
 
+export const adIdeaSourceRefSchema = z.object({
+  exampleId: z.string().optional(),
+  title: z.string(),
+  url: z.string().optional(),
+  platform: z.string().optional(),
+  brandName: z.string().optional(),
+  engagementSignal: z.string().optional(),
+  whyPicked: z.string(),
+});
+
 export const adIdeaSchema = z.object({
   id: z.string(),
   platform: z.string(),
@@ -176,6 +186,7 @@ export const adIdeaSchema = z.object({
   scriptOrCaption: z.string(),
   whyThisWorks: z.string(),
   inspiredBy: z.string().optional(),
+  sourceRef: adIdeaSourceRefSchema.optional(),
   priority: z.enum(["high", "medium", "low"]),
 });
 
@@ -183,6 +194,22 @@ export const competitorAdActivitySchema = z.object({
   competitorName: z.string(),
   isDiscovered: z.boolean(),
   examples: z.array(trendingAdExampleSchema),
+});
+
+const adContentSceneSchema = z.object({
+  order: z.number(),
+  shot: z.string(),
+  dialogueOrText: z.string(),
+  durationSec: z.number().optional(),
+  notes: z.string().optional(),
+});
+
+export const generatedAdContentPayloadSchema = z.object({
+  script: z.string(),
+  scenes: z.array(adContentSceneSchema),
+  captionOrPost: z.string(),
+  hashtags: z.array(z.string()).optional(),
+  assetNotes: z.string().optional(),
 });
 
 export function safeParse<T>(schema: z.ZodType<T>, data: unknown): T | null {

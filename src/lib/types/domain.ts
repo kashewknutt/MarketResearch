@@ -421,6 +421,49 @@ export interface TrendingAdExample {
   citations: Citation[];
 }
 
+export type AdIdeaStatus = "idea" | "content_ready" | "posted" | "published_linkedin";
+
+export interface AdIdeaSourceRef {
+  exampleId?: string;
+  title: string;
+  url?: string;
+  platform?: string;
+  brandName?: string;
+  engagementSignal?: string;
+  whyPicked: string;
+}
+
+export interface AdCreativeConstraints {
+  notes: string;
+  updatedAt: string;
+}
+
+export interface AdContentScene {
+  order: number;
+  shot: string;
+  dialogueOrText: string;
+  durationSec?: number;
+  notes?: string;
+}
+
+export interface GeneratedAdContent {
+  version: number;
+  generatedAt: string;
+  constraints: AdCreativeConstraints;
+  script: string;
+  scenes: AdContentScene[];
+  captionOrPost: string;
+  hashtags?: string[];
+  assetNotes?: string;
+  provenance: Provenance;
+}
+
+export interface LinkedInPublishRecord {
+  postUrn: string;
+  publishedAt: string;
+  commentaryUsed: string;
+}
+
 export interface AdIdea {
   id: string;
   platform: string;
@@ -430,9 +473,16 @@ export interface AdIdea {
   concept: string;
   scriptOrCaption: string;
   whyThisWorks: string;
+  /** @deprecated kept for reading older snapshots; prefer sourceRef */
   inspiredBy?: string;
+  sourceRef?: AdIdeaSourceRef;
   priority: "high" | "medium" | "low";
   provenance: Provenance;
+  status: AdIdeaStatus;
+  statusUpdatedAt?: string;
+  generatedContent?: GeneratedAdContent;
+  generatedContentHistory?: GeneratedAdContent[];
+  linkedInPublish?: LinkedInPublishRecord;
 }
 
 export interface CompetitorAdActivity {

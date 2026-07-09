@@ -10,6 +10,7 @@ import {
 } from "@/lib/agents/validate";
 import { searchChannelVideos, searchTrendingVideos } from "@/lib/integrations/youtube";
 import type { YoutubeVideoSignal } from "@/lib/integrations/youtube";
+import { buildExampleIndex, resolveIdeaSourceRef } from "@/lib/research/stages/ad-idea-sourcing";
 import type {
   AdIdea,
   AdTrendsSnapshot,
@@ -99,11 +100,11 @@ Real YouTube data pulled via the YouTube Data API:
 ${youtubeContext}
 
 Tasks:
-1. Research trending ad/content formats on LinkedIn and Instagram right now (use search grounding), and combine with the YouTube data above to build "trendingNow": a mixed feed of concrete trending examples (own brand, competitors, and other relevant third-party brands/creators), tagging each with a format.
+1. Research trending ad/content formats on LinkedIn and Instagram right now (use search grounding), and combine with the YouTube data above to build "trendingNow": a mixed feed of at least 15 concrete trending examples (own brand, competitors, and other relevant third-party brands/creators), tagging each with a format.
 2. Categorize and enrich the YouTube data: assign a format, write why each is trending, extract a hook where possible.
-3. Group competitor-specific findings into "competitorActivity", one entry per tracked competitor name plus any other relevant brand you find.
+3. Group competitor-specific findings into "competitorActivity", one entry per tracked competitor name plus any other relevant brand you find. Include at least 5 examples per competitor where evidence exists.
 4. Identify brand/account names relevant to this market that are NOT in the tracked competitor list and flag them as "discoveredCompetitors".
-5. Generate "ideasForYou": concrete, actionable video ideas, post ideas, reel/short concepts, and meme formats tailored to ${profile.businessName}, each referencing which trending example inspired it via "inspiredBy" (its title or brand name).
+5. Generate "ideasForYou": at least 20 concrete, actionable ideas tailored to ${profile.businessName}, spanning a spread of formats (reel/short/meme/static_post/carousel/long_video/story/ad_creative) and priorities — do not concentrate on one format. Every idea MUST include a "sourceRef" pointing at one specific entry from "trendingNow" or a competitor's "examples" (reuse its exact "id" as "exampleId", plus copy its title/url/platform/brandName/engagementSignal) and a concrete "whyPicked" explaining exactly why that example justifies this idea. If genuinely no single example inspired it, set "exampleId" to "" and explain in "whyPicked" what general trend justifies it instead — never leave "whyPicked" generic or empty.
 
 Return JSON:
 {
@@ -118,7 +119,12 @@ Return JSON:
     "id": string, "platform": string,
     "format": "reel"|"short"|"meme"|"static_post"|"carousel"|"long_video"|"story"|"ad_creative",
     "title": string, "hook": string, "concept": string, "scriptOrCaption": string,
-    "whyThisWorks": string, "inspiredBy": string, "priority": "high"|"medium"|"low"
+    "whyThisWorks": string, "inspiredBy": string,
+    "sourceRef": {
+      "exampleId": string, "title": string, "url": string, "platform": string,
+      "brandName": string, "engagementSignal": string, "whyPicked": string
+    },
+    "priority": "high"|"medium"|"low"
   }],
   "competitorActivity": [{
     "competitorName": string, "isDiscovered": boolean,
@@ -143,11 +149,6 @@ Return JSON:
     .map((e) => safeParse(trendingAdExampleSchema, withId(e)))
     .filter((e): e is TrendingAdExample => e !== null);
 
-  const ideasForYou: AdIdea[] = (result.data.ideasForYou ?? [])
-    .map((e) => safeParse(adIdeaSchema, withId(e)))
-    .filter((e): e is Omit<AdIdea, "provenance"> => e !== null)
-    .map((e) => ({ ...e, provenance: createProvenance("search", result.citations, 0.7) }));
-
   const competitorActivity: CompetitorAdActivity[] = (result.data.competitorActivity ?? [])
     .map((e) =>
       safeParse(competitorAdActivitySchema, {
@@ -156,6 +157,18 @@ Return JSON:
       }),
     )
     .filter((e): e is CompetitorAdActivity => e !== null);
+
+  const exampleIndex = buildExampleIndex(trendingNow, competitorActivity);
+
+  const ideasForYou: AdIdea[] = (result.data.ideasForYou ?? [])
+    .map((e) => safeParse(adIdeaSchema, withId(e)))
+    .filter((e): e is Omit<AdIdea, "provenance" | "status"> => e !== null)
+    .map((e) => ({
+      ...e,
+      sourceRef: resolveIdeaSourceRef(e, exampleIndex),
+      status: "idea" as const,
+      provenance: createProvenance("search", result.citations, 0.7),
+    }));
 
   return {
     trackedCompetitors,

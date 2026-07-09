@@ -14,8 +14,10 @@ import {
 import { getDataDir } from "@/lib/db/paths";
 import {
   linkedinEnvPresence,
+  linkedInPublishEnvPresence,
   redditEnvPresence,
   verifyLinkedInConnection,
+  verifyLinkedInPublishConnection,
   verifyRedditConnection,
   verifyYoutubeConnection,
   youtubePresence,
@@ -424,6 +426,34 @@ async function checkYoutubeOptional(): Promise<RequirementCheckResult> {
   );
 }
 
+async function checkLinkedInPublishOptional(): Promise<RequirementCheckResult> {
+  const presence = linkedInPublishEnvPresence();
+  const readme = "README — LinkedIn publishing";
+  const docsUrl = "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api";
+
+  if (presence === "none") {
+    return checkSkipped(
+      "linkedin_publish_optional",
+      "LinkedIn publishing (optional)",
+      "Publishes generated ad ideas directly to LinkedIn from Ads & Content.",
+      "Skipped — no LINKEDIN_PERSON_URN in .env. Request the 'Share on LinkedIn' product and add your person URN (see README) to publish in-app.",
+      { actionLabel: readme, actionUrl: docsUrl },
+    );
+  }
+
+  const result = await verifyLinkedInPublishConnection();
+  return check(
+    "linkedin_publish_optional",
+    "LinkedIn publishing (optional)",
+    "Publishes generated ad ideas directly to LinkedIn from Ads & Content.",
+    result.ok,
+    result.message,
+    result.ok
+      ? { detail: result.detail }
+      : { actionLabel: readme, actionUrl: docsUrl, detail: result.detail },
+  );
+}
+
 export async function runSetupRequirementsCheck(): Promise<SetupRequirementsReport> {
   const checks: RequirementCheckResult[] = [];
 
@@ -440,6 +470,7 @@ export async function runSetupRequirementsCheck(): Promise<SetupRequirementsRepo
   checks.push(await checkRedditOptional());
   checks.push(await checkLinkedInOptional());
   checks.push(await checkYoutubeOptional());
+  checks.push(await checkLinkedInPublishOptional());
 
   const requiredChecks = checks.filter((c) =>
     REQUIRED_REQUIREMENT_IDS.includes(c.id),

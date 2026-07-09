@@ -6,6 +6,7 @@ import { linkedInRestHeaders } from "@/lib/integrations/linkedin-api";
 import { getLinkedInAccessToken, linkedInAuthorizedFetch } from "@/lib/integrations/linkedin-oauth";
 import { redditEnvPresence, verifyRedditApi } from "@/lib/integrations/reddit";
 import { verifyYoutubeApi, youtubeEnvPresence } from "@/lib/integrations/youtube";
+import { linkedInPersonUrnConfigured } from "@/lib/integrations/linkedin-posts";
 
 export type IntegrationPresence = "none" | "partial" | "full";
 
@@ -21,6 +22,45 @@ export async function verifyYoutubeConnection(): Promise<{
   detail?: string;
 }> {
   return verifyYoutubeApi();
+}
+
+/**
+ * There's no safe no-op way to verify the `w_member_social` write scope without actually
+ * posting (and the legacy /v2/me profile check tests an unrelated read scope), so this only
+ * confirms LINKEDIN_PERSON_URN is present/well-formed and a token is obtainable — actual
+ * write permission is confirmed on first real publish attempt.
+ */
+export async function verifyLinkedInPublishConnection(): Promise<{
+  ok: boolean;
+  message: string;
+  detail?: string;
+}> {
+  const personUrn = process.env.LINKEDIN_PERSON_URN?.trim();
+  if (!personUrn) {
+    return {
+      ok: false,
+      message: "LINKEDIN_PERSON_URN not set — publishing to LinkedIn is unavailable until configured (see README).",
+    };
+  }
+  if (!/^urn:li:person:.+/.test(personUrn)) {
+    return {
+      ok: false,
+      message: `LINKEDIN_PERSON_URN is set but doesn't look like a person URN (expected "urn:li:person:{id}"). Got: ${personUrn}`,
+    };
+  }
+  const token = await getLinkedInAccessToken();
+  if (!token) {
+    return { ok: false, message: "No LinkedIn access token available — see README LinkedIn section." };
+  }
+  return {
+    ok: true,
+    message: "LinkedIn publish credentials configured. Full write permission (w_member_social) is confirmed on your first publish attempt.",
+    detail: `Person URN: ${personUrn}`,
+  };
+}
+
+export function linkedInPublishEnvPresence(): "none" | "full" {
+  return linkedInPersonUrnConfigured() ? "full" : "none";
 }
 
 export function linkedinEnvPresence(): IntegrationPresence {

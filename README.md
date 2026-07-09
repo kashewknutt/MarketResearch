@@ -111,6 +111,7 @@ Add these to `.env.local` when you want extra signals. The app still runs withou
 | `LINKEDIN_REFRESH_TOKEN` | **Advertising API** — used to refresh access token when it expires |
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | Required for automatic token refresh |
 | `LINKEDIN_AD_ACCOUNT_ID` | **Advertising API** — sponsored ad account ID for real spend in **Financial Analysis** |
+| `LINKEDIN_PERSON_URN` | **Share on LinkedIn** — your `urn:li:person:{id}`, needed to publish posts from **Ads & Content** |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 key — real trending videos for **Ads & Content** research |
 | `GEMINI_BILLING_TIER` | `paid` (default) or `free` — affects cost estimates on **API Costs** |
 | `MARKET_RESEARCH_DATA_DIR` | Override where SQLite and snapshots are stored (Electron sets this automatically in production) |
@@ -312,6 +313,28 @@ Add your company **LinkedIn page URL** in onboarding **Online presence** — use
 
 ---
 
+### LinkedIn API — enabling in-app publishing (Share on LinkedIn product)
+
+This is a **separate, optional** capability from the read-only Advertising API integration above. It lets **Ads & Content** publish generated ideas directly to LinkedIn as text/caption posts (via the current `POST /rest/posts` Posts API — no native video/image upload, since this app only generates scripts and captions, not rendered video files).
+
+1. In your existing LinkedIn Developer app ([linkedin.com/developers/apps](https://www.linkedin.com/developers/apps)) → **Products** tab → request **"Share on LinkedIn"**. This grants the `w_member_social` scope needed to post as yourself. Your existing **Advertising API** product/approval is untouched.
+2. Also add **"Sign In with LinkedIn using OpenID Connect"** — this is self-serve (no review wait), unlike Share on LinkedIn. It's used only once, manually, to look up your own person ID.
+3. Regenerate your access/refresh token via LinkedIn's OAuth token tools, requesting `w_member_social` and `openid profile` alongside whatever Advertising API scope you already use — do this as **one** token covering both, not two separate ones. Update `LINKEDIN_ACCESS_TOKEN` / `LINKEDIN_REFRESH_TOKEN` in `.env.local`.
+4. With that token, make one manual call to fetch your person ID:
+   ```bash
+   curl -H "Authorization: Bearer YOUR_ACCESS_TOKEN" https://api.linkedin.com/v2/userinfo
+   ```
+   Copy the `sub` field from the response and format it as `urn:li:person:{sub}`.
+5. Add to `.env.local`:
+   ```env
+   LINKEDIN_PERSON_URN=urn:li:person:your_sub_value
+   ```
+6. Restart the dev server. Check `/setup` for the new "LinkedIn publishing (optional)" status.
+
+**Scope note:** only personal-profile posting (`w_member_social`) is implemented — no company-page posting (`w_organization_social`) and no native video/image upload. For video-format ideas, generate the script/caption in-app and upload the actual recorded video yourself via LinkedIn directly; "Publish to LinkedIn" posts the caption/text only.
+
+---
+
 ## Environment reference
 
 | Variable | Required | Description |
@@ -324,6 +347,7 @@ Add your company **LinkedIn page URL** in onboarding **Online presence** — use
 | `LINKEDIN_REFRESH_TOKEN` | No* | Refresh expired access tokens |
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | No* | OAuth refresh |
 | `LINKEDIN_AD_ACCOUNT_ID` | No* | Sponsored ad account ID |
+| `LINKEDIN_PERSON_URN` | No | Enables publishing generated ideas to LinkedIn from Ads & Content |
 | `YOUTUBE_API_KEY` | No | Real trending YouTube videos in Ads & Content research |
 
 ---

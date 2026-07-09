@@ -16,6 +16,13 @@ import type { ColumnDef } from "@tanstack/react-table";
 const ideaCol = createColumnHelper<AdIdea>();
 const exampleCol = createColumnHelper<TrendingAdExample>();
 
+const STATUS_LABELS: Record<string, string> = {
+  idea: "Idea",
+  content_ready: "Content ready",
+  posted: "Posted",
+  published_linkedin: "Published (LinkedIn)",
+};
+
 const ideaColumns: ColumnDef<AdIdea, any>[] = [
   ideaCol.accessor("platform", { header: "Platform" }),
   ideaCol.accessor("format", {
@@ -24,6 +31,10 @@ const ideaColumns: ColumnDef<AdIdea, any>[] = [
   }),
   ideaCol.accessor("title", { header: "Idea" }),
   ideaCol.accessor("priority", { header: "Priority" }),
+  ideaCol.accessor("status", {
+    header: "Status",
+    cell: (i) => STATUS_LABELS[i.getValue()] ?? i.getValue(),
+  }),
 ];
 
 const exampleColumns: ColumnDef<TrendingAdExample, any>[] = [
@@ -50,6 +61,10 @@ export default function AdsPage() {
   const [selectedIdea, setSelectedIdea] = useState<AdIdea | null>(null);
   const [selectedExample, setSelectedExample] = useState<TrendingAdExample | null>(null);
   const [newCompetitor, setNewCompetitor] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [generateCount, setGenerateCount] = useState(10);
+  const [generatingMore, setGeneratingMore] = useState(false);
+  const [generateMoreError, setGenerateMoreError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch("/api/ads")
@@ -75,6 +90,38 @@ export default function AdsPage() {
     },
     [],
   );
+
+  const handleIdeaUpdated = useCallback(
+    (updated: AdTrendsSnapshot) => {
+      setAds(updated);
+      setSelectedIdea((prev) =>
+        prev ? (updated.ideasForYou.find((i) => i.id === prev.id) ?? prev) : prev,
+      );
+    },
+    [],
+  );
+
+  const generateMoreIdeas = useCallback(async () => {
+    setGeneratingMore(true);
+    setGenerateMoreError(null);
+    try {
+      const res = await fetch("/api/ads/ideas/generate-more", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count: generateCount }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setGenerateMoreError(data.message ?? data.error ?? "Could not generate more ideas");
+        return;
+      }
+      setAds(data.ads);
+    } catch {
+      setGenerateMoreError("Could not generate more ideas — check your connection and try again.");
+    } finally {
+      setGeneratingMore(false);
+    }
+  }, [generateCount]);
 
   if (!ads) {
     return (
@@ -208,9 +255,61 @@ export default function AdsPage() {
 
       {tab === "ideas" && (
         <div className="space-y-4">
-          <p className="text-xs text-slate-500">Click a row for the full concept and script draft.</p>
-          <DataTable data={ads.ideasForYou} columns={ideaColumns} onRowClick={setSelectedIdea} />
-          <AdIdeaDetailSheet idea={selectedIdea} onClose={() => setSelectedIdea(null)} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs text-slate-500">
+              {ads.ideasForYou.filter((i) => i.status !== "idea").length} of{" "}
+              {ads.ideasForYou.length} actioned. Click a row for the full concept, script draft,
+              and to generate content.
+            </p>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+            >
+              <option value="all">All statuses</option>
+              <option value="idea">Idea</option>
+              <option value="content_ready">Content ready</option>
+              <option value="posted">Posted</option>
+              <option value="published_linkedin">Published (LinkedIn)</option>
+            </select>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-100 p-3">
+            <span className="text-xs text-slate-600">Generate</span>
+            <input
+              type="number"
+              min={1}
+              max={25}
+              value={generateCount}
+              onChange={(e) => setGenerateCount(Number(e.target.value) || 1)}
+              className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-xs"
+            />
+            <span className="text-xs text-slate-600">more ideas</span>
+            <button
+              type="button"
+              onClick={generateMoreIdeas}
+              disabled={generatingMore}
+              className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-800 disabled:opacity-50"
+            >
+              {generatingMore ? "Generating…" : "Generate more ideas"}
+            </button>
+            {generateMoreError && <p className="text-xs text-rose-700">{generateMoreError}</p>}
+          </div>
+
+          <DataTable
+            data={
+              statusFilter === "all"
+                ? ads.ideasForYou
+                : ads.ideasForYou.filter((i) => i.status === statusFilter)
+            }
+            columns={ideaColumns}
+            onRowClick={setSelectedIdea}
+          />
+          <AdIdeaDetailSheet
+            idea={selectedIdea}
+            onClose={() => setSelectedIdea(null)}
+            onIdeaUpdated={handleIdeaUpdated}
+          />
         </div>
       )}
 
