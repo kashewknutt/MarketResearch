@@ -8,8 +8,50 @@ import { redditEnvPresence, verifyRedditApi } from "@/lib/integrations/reddit";
 import { verifyYoutubeApi, youtubeEnvPresence } from "@/lib/integrations/youtube";
 import { linkedInPersonUrnConfigured } from "@/lib/integrations/linkedin-posts";
 import { apifyEnvPresence, verifyApifyConnection } from "@/lib/integrations/apify";
+import { getYoutubeAccessToken, youtubeOAuthConfigured } from "@/lib/integrations/youtube-oauth";
 
 export { apifyEnvPresence, verifyApifyConnection };
+
+export function youtubePublishEnvPresence(): "none" | "full" {
+  return youtubeOAuthConfigured() ? "full" : "none";
+}
+
+export async function verifyYoutubePublishConnection(): Promise<{
+  ok: boolean;
+  message: string;
+  detail?: string;
+}> {
+  if (!youtubeOAuthConfigured()) {
+    return {
+      ok: false,
+      message: "YouTube OAuth not configured — publishing/uploading video is unavailable until set up (see README).",
+    };
+  }
+
+  const token = await getYoutubeAccessToken();
+  if (!token) {
+    return { ok: false, message: "Could not obtain a YouTube OAuth access token — check YOUTUBE_OAUTH_* env vars." };
+  }
+
+  try {
+    const res = await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { ok: false, message: `YouTube OAuth check failed (${res.status}).`, detail: text.slice(0, 200) };
+    }
+    const data = (await res.json()) as { items?: Array<{ id?: string }> };
+    return {
+      ok: true,
+      message: "YouTube OAuth credentials verified.",
+      detail: data.items?.[0]?.id ? `Channel: ${data.items[0].id}` : undefined,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "YouTube OAuth check failed";
+    return { ok: false, message };
+  }
+}
 
 export type IntegrationPresence = "none" | "partial" | "full";
 

@@ -79,7 +79,8 @@ export default function SetupPage() {
         c.id === "linkedin_optional" ||
         c.id === "youtube_optional" ||
         c.id === "linkedin_publish_optional" ||
-        c.id === "apify_optional",
+        c.id === "apify_optional" ||
+        c.id === "youtube_publish_optional",
     ) ?? [];
 
   return (
@@ -189,6 +190,7 @@ export default function SetupPage() {
               <li>YouTube — real trending videos in Ads & Content</li>
               <li>LinkedIn publishing — post generated ideas directly from Ads & Content</li>
               <li>Apify — verified Instagram/LinkedIn post data (views/likes/comments) in Ads & Content</li>
+              <li>YouTube publishing — upload video and read back stats from Ads & Content</li>
             </ul>
             <p className="mt-3 text-xs text-slate-500">Never used by this app:</p>
             <ul className="mt-1 list-inside list-disc space-y-1 text-xs text-slate-600">

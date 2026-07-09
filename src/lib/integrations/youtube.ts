@@ -1,4 +1,5 @@
 import { runApifyActor } from "@/lib/integrations/apify";
+import type { EngagementMetrics } from "@/lib/types/domain";
 
 export interface YoutubeVideoSignal {
   videoId: string;
@@ -217,4 +218,23 @@ export async function fetchTrendingVideosViaApify(
       thumbnailUrl: i.thumbnailUrl,
       url: i.url,
     }));
+}
+
+/** Fetches real stats for a known video id (public data, works with just YOUTUBE_API_KEY, no OAuth). */
+export async function getYoutubeVideoStats(videoId: string): Promise<EngagementMetrics | null> {
+  if (!youtubeEnvPresence()) return null;
+
+  try {
+    const res = await ytFetch("videos", { part: "statistics", id: videoId });
+    const stats: YtVideoStatsItem | undefined = res.items?.[0];
+    if (!stats) return null;
+    return {
+      viewCount: stats.statistics?.viewCount ? Number(stats.statistics.viewCount) : undefined,
+      likeCount: stats.statistics?.likeCount ? Number(stats.statistics.likeCount) : undefined,
+      commentCount: stats.statistics?.commentCount ? Number(stats.statistics.commentCount) : undefined,
+    };
+  } catch (err) {
+    console.warn(`YouTube stats fetch failed for video ${videoId}:`, err);
+    return null;
+  }
 }

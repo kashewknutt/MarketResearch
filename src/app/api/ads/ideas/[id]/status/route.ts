@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildManualPublishInfo } from "@/lib/research/stages/ad-publish-info";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type { AdIdeaStatus, AdTrendsSnapshot } from "@/lib/types/domain";
 
@@ -11,6 +12,8 @@ export async function POST(
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const status = body.status as AdIdeaStatus;
+  const platform = typeof body.platform === "string" ? body.platform : undefined;
+  const url = typeof body.url === "string" ? body.url : undefined;
 
   if (!VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -23,9 +26,12 @@ export async function POST(
 
   const fresh = (await getSnapshot<AdTrendsSnapshot>("ads")) ?? ads;
   const statusUpdatedAt = new Date().toISOString();
-  const updatedIdeas = fresh.ideasForYou.map((i) =>
-    i.id === id ? { ...i, status, statusUpdatedAt } : i,
-  );
+  const updatedIdeas = fresh.ideasForYou.map((i) => {
+    if (i.id !== id) return i;
+    const publishInfo =
+      status === "posted" && platform ? buildManualPublishInfo(platform, url) : i.publishInfo;
+    return { ...i, status, statusUpdatedAt, publishInfo };
+  });
   const updated: AdTrendsSnapshot = { ...fresh, ideasForYou: updatedIdeas };
   await saveSnapshot("ads", updated);
 

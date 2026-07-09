@@ -486,6 +486,22 @@ export interface LinkedInPublishRecord {
   commentaryUsed: string;
 }
 
+export interface AdPublishInfo {
+  platform: string;
+  url?: string;
+  postedVia: "manual" | "linkedin_api" | "youtube_api";
+  linkedInPostUrn?: string;
+  youtubeVideoId?: string;
+}
+
+export interface PerformanceSnapshot {
+  id: string;
+  fetchedAt: string;
+  source: "linkedin_api" | "youtube_api" | "manual";
+  metrics: EngagementMetrics;
+  note?: string;
+}
+
 export interface AdIdea {
   id: string;
   platform: string;
@@ -505,6 +521,8 @@ export interface AdIdea {
   generatedContent?: GeneratedAdContent;
   generatedContentHistory?: GeneratedAdContent[];
   linkedInPublish?: LinkedInPublishRecord;
+  publishInfo?: AdPublishInfo;
+  performanceHistory?: PerformanceSnapshot[];
 }
 
 export interface CompetitorAdActivity {

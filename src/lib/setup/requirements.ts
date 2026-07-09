@@ -22,7 +22,9 @@ import {
   verifyLinkedInPublishConnection,
   verifyRedditConnection,
   verifyYoutubeConnection,
+  verifyYoutubePublishConnection,
   youtubePresence,
+  youtubePublishEnvPresence,
 } from "@/lib/setup/integration-checks";
 import type {
   RequirementCheckResult,
@@ -482,6 +484,32 @@ async function checkApifyOptional(): Promise<RequirementCheckResult> {
   );
 }
 
+async function checkYoutubePublishOptional(): Promise<RequirementCheckResult> {
+  const docsUrl = "https://developers.google.com/youtube/v3/guides/uploading_a_video";
+
+  if (youtubePublishEnvPresence() === "none") {
+    return checkSkipped(
+      "youtube_publish_optional",
+      "YouTube publishing (optional)",
+      "Uploads and publishes video directly to YouTube from Ads & Content.",
+      "Skipped — no YOUTUBE_OAUTH_* vars in .env. Run scripts/youtube-oauth-setup.cjs (see README) to enable in-app publishing.",
+      { actionLabel: "YouTube video upload docs", actionUrl: docsUrl },
+    );
+  }
+
+  const result = await verifyYoutubePublishConnection();
+  return check(
+    "youtube_publish_optional",
+    "YouTube publishing (optional)",
+    "Uploads and publishes video directly to YouTube from Ads & Content.",
+    result.ok,
+    result.message,
+    result.ok
+      ? { detail: result.detail }
+      : { actionLabel: "YouTube video upload docs", actionUrl: docsUrl, detail: result.detail },
+  );
+}
+
 export async function runSetupRequirementsCheck(): Promise<SetupRequirementsReport> {
   const checks: RequirementCheckResult[] = [];
 
@@ -500,6 +528,7 @@ export async function runSetupRequirementsCheck(): Promise<SetupRequirementsRepo
   checks.push(await checkYoutubeOptional());
   checks.push(await checkLinkedInPublishOptional());
   checks.push(await checkApifyOptional());
+  checks.push(await checkYoutubePublishOptional());
 
   const requiredChecks = checks.filter((c) =>
     REQUIRED_REQUIREMENT_IDS.includes(c.id),

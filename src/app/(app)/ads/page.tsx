@@ -184,6 +184,7 @@ export default function AdsPage() {
           { id: "ideas", label: "Ideas for you" },
           { id: "trending", label: "Trending now" },
           { id: "competitors", label: "By competitor" },
+          { id: "performance", label: "Performance" },
         ]}
         active={tab}
         onChange={setTab}
@@ -473,6 +474,77 @@ export default function AdsPage() {
             ))
           )}
           <TrendingAdDetailSheet example={selectedExample} onClose={() => setSelectedExample(null)} />
+        </div>
+      )}
+
+      {tab === "performance" && (
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            What&apos;s working — every idea you&apos;ve published, with its latest tracked
+            metrics. Click a row to refresh or add stats.
+          </p>
+          {(() => {
+            const published = ads.ideasForYou.filter((i) => i.publishInfo);
+            if (published.length === 0) {
+              return (
+                <p className="text-sm text-slate-500">
+                  Nothing published yet — mark an idea as posted or publish it directly to see it
+                  here.
+                </p>
+              );
+            }
+            return (
+              <div className="overflow-x-auto rounded-xl border border-slate-100">
+                <table className="w-full min-w-[640px] text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Idea</th>
+                      <th className="px-4 py-2 font-medium">Platform</th>
+                      <th className="px-4 py-2 font-medium">Latest metrics</th>
+                      <th className="px-4 py-2 font-medium">Last updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {published.map((i) => {
+                      const latest = i.performanceHistory?.[i.performanceHistory.length - 1];
+                      return (
+                        <tr
+                          key={i.id}
+                          className="cursor-pointer border-t border-slate-50 hover:bg-violet-50/30"
+                          onClick={() => setSelectedIdea(i)}
+                        >
+                          <td className="px-4 py-2.5 text-slate-700">{i.title}</td>
+                          <td className="px-4 py-2.5 text-slate-700">{i.publishInfo!.platform}</td>
+                          <td className="px-4 py-2.5 text-slate-700">
+                            {latest
+                              ? [
+                                  latest.metrics.viewCount != null ? `${latest.metrics.viewCount} views` : null,
+                                  latest.metrics.likeCount != null ? `${latest.metrics.likeCount} likes` : null,
+                                  latest.metrics.commentCount != null
+                                    ? `${latest.metrics.commentCount} comments`
+                                    : null,
+                                  latest.metrics.shareCount != null ? `${latest.metrics.shareCount} shares` : null,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ") || "—"
+                              : "No stats yet"}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-500">
+                            {latest ? new Date(latest.fetchedAt).toLocaleDateString() : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+          <AdIdeaDetailSheet
+            idea={selectedIdea}
+            onClose={() => setSelectedIdea(null)}
+            onIdeaUpdated={handleIdeaUpdated}
+          />
         </div>
       )}
     </div>

@@ -114,6 +114,7 @@ Add these to `.env.local` when you want extra signals. The app still runs withou
 | `LINKEDIN_PERSON_URN` | **Share on LinkedIn** — your `urn:li:person:{id}`, needed to publish posts from **Ads & Content** |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 key — real trending videos for **Ads & Content** research |
 | `APIFY_API_TOKEN` | Apify token — real, verified Instagram/LinkedIn post data (views/likes/comments) in **Ads & Content** |
+| `YOUTUBE_OAUTH_CLIENT_ID` / `_CLIENT_SECRET` / `_REFRESH_TOKEN` | Enables uploading/publishing video to YouTube from **Ads & Content** (see `scripts/youtube-oauth-setup.cjs`) |
 | `GEMINI_BILLING_TIER` | `paid` (default) or `free` — affects cost estimates on **API Costs** |
 | `MARKET_RESEARCH_DATA_DIR` | Override where SQLite and snapshots are stored (Electron sets this automatically in production) |
 
@@ -332,7 +333,9 @@ This is a **separate, optional** capability from the read-only Advertising API i
    ```
 6. Restart the dev server. Check `/setup` for the new "LinkedIn publishing (optional)" status.
 
-**Scope note:** only personal-profile posting (`w_member_social`) is implemented — no company-page posting (`w_organization_social`) and no native video/image upload. For video-format ideas, generate the script/caption in-app and upload the actual recorded video yourself via LinkedIn directly; "Publish to LinkedIn" posts the caption/text only.
+**Scope note:** only personal-profile posting (`w_member_social`) is implemented — no company-page posting (`w_organization_social`). You can attach your finished image or video file directly in the "Publish to LinkedIn" flow (Ads & Content) — no new scope is needed for this, LinkedIn's Images/Videos upload APIs already work under `w_member_social`.
+
+**Tracking performance (views/likes/comments) — a real limitation to know about:** reading engagement back for a post requires `r_member_social_feed`, which LinkedIn's own docs mark **"restricted, granted to select developers only"** — unlike posting, this is not self-serve. You can request the **Community Management API** product and ask for this scope, but there's a real chance it won't be granted to a personal app. The "Refresh" button in Ads & Content → Performance tries this automatically; if LinkedIn hasn't granted the permission, it tells you clearly and falls back to a manual stats-entry form (the same one used for Instagram) — nothing is ever silently faked.
 
 ---
 
@@ -360,6 +363,28 @@ Without Apify, **Ads & Content** researches LinkedIn and Instagram trends entire
 
 ---
 
+### YouTube — enabling in-app video publishing (optional)
+
+Reading YouTube stats already works with just `YOUTUBE_API_KEY` (no setup needed beyond what's above). **Uploading/publishing video** needs real user consent — an API key alone can't do it — so this uses a one-time local script instead of an in-app "Connect" button, matching how LinkedIn's token is set up in this app.
+
+1. In the same Google Cloud project as your `YOUTUBE_API_KEY`, go to **APIs & Services → Credentials → Create Credentials → OAuth client ID**, type **"Desktop app"**. Copy the client ID and secret.
+2. Run:
+   ```bash
+   node scripts/youtube-oauth-setup.cjs YOUR_CLIENT_ID YOUR_CLIENT_SECRET
+   ```
+3. Open the printed URL, sign in with the YouTube channel's account, approve access.
+4. The script prints three values — add them to `.env.local`:
+   ```env
+   YOUTUBE_OAUTH_CLIENT_ID=your_client_id
+   YOUTUBE_OAUTH_CLIENT_SECRET=your_client_secret
+   YOUTUBE_OAUTH_REFRESH_TOKEN=the_printed_refresh_token
+   ```
+5. Restart the dev server. Check `/setup` for the new "YouTube publishing (optional)" status.
+
+**What this enables:** uploading your final video directly to your channel (as public/unlisted/private) from an idea's detail sheet in Ads & Content, and refreshing real view/like/comment counts afterward via the same read-only API key — no OAuth needed for reading, only for uploading.
+
+---
+
 ## Environment reference
 
 | Variable | Required | Description |
@@ -375,6 +400,7 @@ Without Apify, **Ads & Content** researches LinkedIn and Instagram trends entire
 | `LINKEDIN_PERSON_URN` | No | Enables publishing generated ideas to LinkedIn from Ads & Content |
 | `YOUTUBE_API_KEY` | No | Real trending YouTube videos in Ads & Content research |
 | `APIFY_API_TOKEN` | No | Real, verified Instagram/LinkedIn post data (views/likes/comments) in Ads & Content |
+| `YOUTUBE_OAUTH_CLIENT_ID` / `YOUTUBE_OAUTH_CLIENT_SECRET` / `YOUTUBE_OAUTH_REFRESH_TOKEN` | No | Enables uploading/publishing video to YouTube from Ads & Content (obtained via `scripts/youtube-oauth-setup.cjs`) |
 
 ---
 

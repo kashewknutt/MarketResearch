@@ -79,29 +79,63 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  const [markPostedOpen, setMarkPostedOpen] = useState(false);
+  const [markPostedPlatform, setMarkPostedPlatform] = useState("LinkedIn");
+  const [markPostedUrl, setMarkPostedUrl] = useState("");
   const [markingPosted, setMarkingPosted] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishText, setPublishText] = useState("");
+  const [publishFile, setPublishFile] = useState<File | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishedUrn, setPublishedUrn] = useState<string | null>(null);
 
+  const [ytOpen, setYtOpen] = useState(false);
+  const [ytFile, setYtFile] = useState<File | null>(null);
+  const [ytTitle, setYtTitle] = useState("");
+  const [ytDescription, setYtDescription] = useState("");
+  const [ytPrivacy, setYtPrivacy] = useState<"public" | "unlisted" | "private">("unlisted");
+  const [ytUploading, setYtUploading] = useState(false);
+  const [ytError, setYtError] = useState<string | null>(null);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualViews, setManualViews] = useState("");
+  const [manualLikes, setManualLikes] = useState("");
+  const [manualComments, setManualComments] = useState("");
+  const [manualShares, setManualShares] = useState("");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+
   useEffect(() => {
     setConstraintsNotes(idea?.generatedContent?.constraints.notes ?? "");
     setGenerateError(null);
+    setMarkPostedOpen(false);
+    setMarkPostedUrl("");
     setStatusError(null);
     setPublishOpen(false);
+    setPublishFile(null);
     setPublishError(null);
     setPublishedUrn(null);
     setPublishText(idea?.generatedContent?.captionOrPost ?? idea?.scriptOrCaption ?? "");
+    setYtOpen(false);
+    setYtFile(null);
+    setYtTitle(idea?.title ?? "");
+    setYtDescription(idea?.generatedContent?.captionOrPost ?? idea?.scriptOrCaption ?? "");
+    setYtError(null);
+    setRefreshError(null);
+    setManualOpen(false);
+    setManualViews("");
+    setManualLikes("");
+    setManualComments("");
+    setManualShares("");
   }, [idea?.id]);
 
   if (!idea) return null;
 
   const hasContent = Boolean(idea.generatedContent);
-  const isPosted = idea.status === "posted" || idea.status === "published_linkedin";
 
   async function generateContent() {
     if (!idea) return;
@@ -126,7 +160,7 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
     }
   }
 
-  async function markPosted() {
+  async function submitMarkPosted() {
     if (!idea) return;
     setMarkingPosted(true);
     setStatusError(null);
@@ -134,7 +168,7 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
       const res = await fetch(`/api/ads/ideas/${idea.id}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "posted" }),
+        body: JSON.stringify({ status: "posted", platform: markPostedPlatform, url: markPostedUrl || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -142,6 +176,7 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
         return;
       }
       onIdeaUpdated(data.ads);
+      setMarkPostedOpen(false);
     } catch {
       setStatusError("Could not update status — check your connection and try again.");
     } finally {
@@ -154,11 +189,19 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
     setPublishing(true);
     setPublishError(null);
     try {
-      const res = await fetch(`/api/ads/ideas/${idea.id}/publish/linkedin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentary: publishText }),
-      });
+      let res: Response;
+      if (publishFile) {
+        const form = new FormData();
+        form.set("commentary", publishText);
+        form.set("media", publishFile);
+        res = await fetch(`/api/ads/ideas/${idea.id}/publish/linkedin`, { method: "POST", body: form });
+      } else {
+        res = await fetch(`/api/ads/ideas/${idea.id}/publish/linkedin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ commentary: publishText }),
+        });
+      }
       const data = await res.json();
       if (!res.ok) {
         setPublishError(data.message ?? data.error ?? "Publish failed");
@@ -172,6 +215,90 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
       setPublishing(false);
     }
   }
+
+  async function publishToYoutube() {
+    if (!idea || !ytFile) return;
+    setYtUploading(true);
+    setYtError(null);
+    try {
+      const form = new FormData();
+      form.set("media", ytFile);
+      form.set("title", ytTitle);
+      form.set("description", ytDescription);
+      form.set("privacyStatus", ytPrivacy);
+      const res = await fetch(`/api/ads/ideas/${idea.id}/publish/youtube`, { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setYtError(data.message ?? data.error ?? "YouTube upload failed");
+        return;
+      }
+      onIdeaUpdated(data.ads);
+    } catch {
+      setYtError("YouTube upload failed — check your connection and try again.");
+    } finally {
+      setYtUploading(false);
+    }
+  }
+
+  async function refreshPerformance() {
+    if (!idea) return;
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      const res = await fetch(`/api/ads/ideas/${idea.id}/performance/refresh`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setRefreshError(data.message ?? data.error ?? "Refresh failed");
+        if (data.error === "linkedin_permission_denied" || data.error === "no_automatic_source") {
+          setManualOpen(true);
+        }
+        return;
+      }
+      onIdeaUpdated(data.ads);
+    } catch {
+      setRefreshError("Refresh failed — check your connection and try again.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  async function submitManualPerformance() {
+    if (!idea) return;
+    setManualSubmitting(true);
+    setRefreshError(null);
+    try {
+      const toNum = (v: string) => (v.trim() ? Number(v) : undefined);
+      const res = await fetch(`/api/ads/ideas/${idea.id}/performance/manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          viewCount: toNum(manualViews),
+          likeCount: toNum(manualLikes),
+          commentCount: toNum(manualComments),
+          shareCount: toNum(manualShares),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRefreshError(data.message ?? data.error ?? "Could not save stats");
+        return;
+      }
+      onIdeaUpdated(data.ads);
+      setManualViews("");
+      setManualLikes("");
+      setManualComments("");
+      setManualShares("");
+      setManualOpen(false);
+    } catch {
+      setRefreshError("Could not save stats — check your connection and try again.");
+    } finally {
+      setManualSubmitting(false);
+    }
+  }
+
+  const canAutoRefresh =
+    (idea.publishInfo?.platform === "LinkedIn" && idea.publishInfo.linkedInPostUrn) ||
+    (idea.publishInfo?.platform === "YouTube" && idea.publishInfo.youtubeVideoId);
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
@@ -328,15 +455,69 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
         </section>
 
         <section className="rounded-lg border border-slate-100 p-4">
-          <label className="flex items-center gap-2 text-xs text-slate-700">
-            <input
-              type="checkbox"
-              checked={isPosted}
-              disabled={isPosted || markingPosted}
-              onChange={markPosted}
-            />
-            Mark as posted
-          </label>
+          <p className="text-sm font-medium text-slate-800">Publishing status</p>
+          {idea.publishInfo ? (
+            <div className="mt-2 text-xs text-slate-700">
+              <p>
+                Posted on <strong>{idea.publishInfo.platform}</strong>
+                {idea.publishInfo.url && (
+                  <>
+                    {" — "}
+                    <a href={idea.publishInfo.url} target="_blank" rel="noopener noreferrer" className="text-sky-700 underline">
+                      view post
+                    </a>
+                  </>
+                )}
+              </p>
+            </div>
+          ) : !markPostedOpen ? (
+            <button
+              type="button"
+              onClick={() => setMarkPostedOpen(true)}
+              className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Mark as posted
+            </button>
+          ) : (
+            <div className="mt-2 space-y-2">
+              <div className="flex gap-2">
+                <select
+                  value={markPostedPlatform}
+                  onChange={(e) => setMarkPostedPlatform(e.target.value)}
+                  className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                >
+                  <option>LinkedIn</option>
+                  <option>Instagram</option>
+                  <option>YouTube</option>
+                  <option>X</option>
+                  <option>Other</option>
+                </select>
+                <input
+                  value={markPostedUrl}
+                  onChange={(e) => setMarkPostedUrl(e.target.value)}
+                  placeholder="Post URL (optional)"
+                  className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={submitMarkPosted}
+                  disabled={markingPosted}
+                  className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-800 disabled:opacity-50"
+                >
+                  {markingPosted ? "Saving…" : "Confirm"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMarkPostedOpen(false)}
+                  className="rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {statusError && <p className="mt-2 text-xs text-rose-700">{statusError}</p>}
         </section>
 
@@ -374,6 +555,17 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
                   rows={4}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
                 />
+                <div>
+                  <label className="text-xs text-slate-500">
+                    Attach the final image/video (optional)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={(e) => setPublishFile(e.target.files?.[0] ?? null)}
+                    className="mt-1 block w-full text-xs"
+                  />
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -396,6 +588,165 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
                 {publishedUrn && (
                   <p className="text-xs text-emerald-700">Published — post URN {publishedUrn}</p>
                 )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {idea.platform.toLowerCase() === "youtube" && (
+          <section className="rounded-lg border border-rose-100 bg-rose-50/40 p-4">
+            <p className="text-sm font-medium text-slate-800">Publish to YouTube</p>
+            {idea.publishInfo?.youtubeVideoId ? (
+              <p className="mt-1 text-xs text-emerald-700">
+                Uploaded —{" "}
+                <a href={idea.publishInfo.url} target="_blank" rel="noopener noreferrer" className="underline">
+                  view video
+                </a>
+              </p>
+            ) : !ytOpen ? (
+              <button
+                type="button"
+                onClick={() => setYtOpen(true)}
+                className="mt-2 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-50"
+              >
+                Publish to YouTube
+              </button>
+            ) : (
+              <div className="mt-2 space-y-2">
+                <input
+                  type="file"
+                  accept="video/*"
+                  onChange={(e) => setYtFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-xs"
+                />
+                <input
+                  value={ytTitle}
+                  onChange={(e) => setYtTitle(e.target.value)}
+                  placeholder="Title"
+                  className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                />
+                <textarea
+                  value={ytDescription}
+                  onChange={(e) => setYtDescription(e.target.value)}
+                  rows={3}
+                  placeholder="Description"
+                  className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                />
+                <select
+                  value={ytPrivacy}
+                  onChange={(e) => setYtPrivacy(e.target.value as typeof ytPrivacy)}
+                  className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                >
+                  <option value="unlisted">Unlisted</option>
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={publishToYoutube}
+                    disabled={ytUploading || !ytFile}
+                    className="rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-rose-800 disabled:opacity-50"
+                  >
+                    {ytUploading ? "Uploading…" : "Upload & publish"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setYtOpen(false)}
+                    disabled={ytUploading}
+                    className="rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {ytError && <p className="text-xs text-rose-700">{ytError}</p>}
+              </div>
+            )}
+          </section>
+        )}
+
+        {idea.publishInfo && (
+          <section className="rounded-lg border border-slate-100 p-4">
+            <p className="text-sm font-medium text-slate-800">Performance</p>
+
+            {idea.performanceHistory && idea.performanceHistory.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {[...idea.performanceHistory].reverse().map((s) => (
+                  <div key={s.id} className="rounded-lg border border-slate-100 p-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">{new Date(s.fetchedAt).toLocaleString()}</span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
+                        {s.source === "manual" ? "Manual" : s.source === "linkedin_api" ? "LinkedIn" : "YouTube"}
+                      </span>
+                    </div>
+                    <MetricsTable metrics={s.metrics} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canAutoRefresh && (
+                <button
+                  type="button"
+                  onClick={refreshPerformance}
+                  disabled={refreshing}
+                  className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-800 disabled:opacity-50"
+                >
+                  {refreshing ? "Refreshing…" : `Refresh from ${idea.publishInfo.platform}`}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setManualOpen((v) => !v)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+              >
+                {manualOpen ? "Cancel manual entry" : "Add stats manually"}
+              </button>
+            </div>
+
+            {refreshError && <p className="mt-2 text-xs text-rose-700">{refreshError}</p>}
+
+            {manualOpen && (
+              <div className="mt-3 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={manualViews}
+                    onChange={(e) => setManualViews(e.target.value)}
+                    placeholder="Views"
+                    inputMode="numeric"
+                    className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    value={manualLikes}
+                    onChange={(e) => setManualLikes(e.target.value)}
+                    placeholder="Likes"
+                    inputMode="numeric"
+                    className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    value={manualComments}
+                    onChange={(e) => setManualComments(e.target.value)}
+                    placeholder="Comments"
+                    inputMode="numeric"
+                    className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                  />
+                  <input
+                    value={manualShares}
+                    onChange={(e) => setManualShares(e.target.value)}
+                    placeholder="Shares"
+                    inputMode="numeric"
+                    className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={submitManualPerformance}
+                  disabled={manualSubmitting}
+                  className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:opacity-50"
+                >
+                  {manualSubmitting ? "Saving…" : "Save snapshot"}
+                </button>
               </div>
             )}
           </section>

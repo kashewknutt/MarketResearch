@@ -9,7 +9,8 @@ export type RequirementId =
   | "linkedin_optional"
   | "youtube_optional"
   | "linkedin_publish_optional"
-  | "apify_optional";
+  | "apify_optional"
+  | "youtube_publish_optional";
 
 /** Required for onboarding; optional integration checks never block continue. */
 export const REQUIRED_REQUIREMENT_IDS: RequirementId[] = [

@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { createLinkedInTextPost } from "@/lib/integrations/linkedin-posts";
+import {
+  createLinkedInMediaPost,
+  createLinkedInTextPost,
+  uploadLinkedInImage,
+  uploadLinkedInVideo,
+} from "@/lib/integrations/linkedin-posts";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type { AdTrendsSnapshot } from "@/lib/types/domain";
 
@@ -14,11 +19,22 @@ export async function POST(
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
   }
 
-  const body = await request.json().catch(() => ({}));
-  const commentary: string | undefined =
-    (typeof body.commentary === "string" && body.commentary.trim()) ||
-    idea.generatedContent?.captionOrPost ||
-    idea.scriptOrCaption;
+  const contentType = request.headers.get("content-type") ?? "";
+  let commentary: string | undefined;
+  let mediaFile: File | null = null;
+
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const commentaryField = form.get("commentary");
+    commentary = typeof commentaryField === "string" && commentaryField.trim() ? commentaryField : undefined;
+    const media = form.get("media");
+    if (media instanceof File && media.size > 0) mediaFile = media;
+  } else {
+    const body = await request.json().catch(() => ({}));
+    commentary = typeof body.commentary === "string" && body.commentary.trim() ? body.commentary : undefined;
+  }
+
+  commentary = commentary || idea.generatedContent?.captionOrPost || idea.scriptOrCaption;
 
   if (!commentary) {
     return NextResponse.json(
@@ -29,7 +45,16 @@ export async function POST(
 
   let postUrn: string;
   try {
-    ({ postUrn } = await createLinkedInTextPost(commentary));
+    if (mediaFile) {
+      const bytes = Buffer.from(await mediaFile.arrayBuffer());
+      const isVideo = mediaFile.type.startsWith("video/");
+      const { urn, kind } = isVideo
+        ? { urn: (await uploadLinkedInVideo(bytes)).videoUrn, kind: "video" as const }
+        : { urn: (await uploadLinkedInImage(bytes)).imageUrn, kind: "image" as const };
+      ({ postUrn } = await createLinkedInMediaPost(commentary, { urn, kind }));
+    } else {
+      ({ postUrn } = await createLinkedInTextPost(commentary));
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Publish failed";
     return NextResponse.json({ error: message }, { status: 502 });
@@ -44,6 +69,12 @@ export async function POST(
           status: "published_linkedin" as const,
           statusUpdatedAt: publishedAt,
           linkedInPublish: { postUrn, publishedAt, commentaryUsed: commentary },
+          publishInfo: {
+            platform: "LinkedIn",
+            url: `https://www.linkedin.com/feed/update/${postUrn}`,
+            postedVia: "linkedin_api" as const,
+            linkedInPostUrn: postUrn,
+          },
         }
       : i,
   );
