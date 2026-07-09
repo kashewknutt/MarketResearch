@@ -13,11 +13,27 @@ export function linkedInDateRange(
   return `(${s},end:(year:${end.year},month:${end.month},day:${end.day}))`;
 }
 
-export function linkedInListUrn(urn: string): string {
-  return `List(${urn})`;
+/**
+ * Rest.li list-of-URNs param, e.g. List(urn%3Ali%3AsponsoredAccount%3A123).
+ * Only the colons inside each URN are percent-encoded — the surrounding
+ * List(...) structure and inter-item commas must stay literal or LinkedIn's
+ * Rest.li query parser rejects the whole request as ILLEGAL_ARGUMENT.
+ */
+export function linkedInListUrn(...urns: string[]): string {
+  return `List(${urns.map((u) => u.replace(/:/g, "%3A")).join(",")})`;
 }
 
-/** Build adAnalytics URL without double-encoding Rest.li params. */
+/**
+ * Builds a raw (non-blanket-encoded) query string for LinkedIn's Rest.li
+ * finder params. Structural characters (:  ,  ( )) inside dateRange, fields,
+ * pivot(s) etc. must remain literal for LinkedIn to parse the compact
+ * object/array syntax — only URN colons are pre-encoded via linkedInListUrn.
+ */
+function restliQuery(parts: Array<[string, string]>): string {
+  return parts.map(([key, value]) => `${key}=${value}`).join("&");
+}
+
+/** Analytics finder: GET /rest/adAnalytics?q=analytics&pivot=...  */
 export function buildAdAnalyticsUrl(params: {
   accountId: string;
   dateRange: string;
@@ -26,7 +42,7 @@ export function buildAdAnalyticsUrl(params: {
   fields?: string;
 }): string {
   const accountUrn = `urn:li:sponsoredAccount:${params.accountId}`;
-  const parts = [
+  const parts: Array<[string, string]> = [
     ["q", "analytics"],
     ["pivot", params.pivot ?? "ACCOUNT"],
     ["timeGranularity", params.timeGranularity ?? "MONTHLY"],
@@ -35,13 +51,14 @@ export function buildAdAnalyticsUrl(params: {
   ];
   if (params.fields) parts.push(["fields", params.fields]);
 
-  const query = parts
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join("&");
-
-  return `https://api.linkedin.com/rest/adAnalytics?${query}`;
+  return `https://api.linkedin.com/rest/adAnalytics?${restliQuery(parts)}`;
 }
 
+/**
+ * Statistics finder: GET /rest/adAnalytics?q=statistics&pivots=List(...)
+ * There is no separate /rest/adStatistics endpoint — "statistics" is a
+ * finder on the same adAnalytics resource (up to 3 pivots).
+ */
 export function buildAdStatisticsUrl(params: {
   accountId: string;
   dateRange: string;
@@ -49,7 +66,7 @@ export function buildAdStatisticsUrl(params: {
   fields?: string;
 }): string {
   const accountUrn = `urn:li:sponsoredAccount:${params.accountId}`;
-  const parts = [
+  const parts: Array<[string, string]> = [
     ["q", "statistics"],
     ["pivots", linkedInListUrn("ACCOUNT")],
     ["timeGranularity", params.timeGranularity ?? "MONTHLY"],
@@ -58,11 +75,7 @@ export function buildAdStatisticsUrl(params: {
   ];
   if (params.fields) parts.push(["fields", params.fields]);
 
-  const query = parts
-    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
-    .join("&");
-
-  return `https://api.linkedin.com/rest/adStatistics?${query}`;
+  return `https://api.linkedin.com/rest/adAnalytics?${restliQuery(parts)}`;
 }
 
 export function datePartsFromDate(d: Date): LinkedInDateParts {

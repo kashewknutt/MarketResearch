@@ -10,6 +10,7 @@ import {
 } from "@/lib/ai/prompts";
 import { createProvenance } from "@/lib/db/provenance";
 import { ensureFullProjectQueues } from "@/lib/research/project-generator";
+import { runAdTrends } from "@/lib/research/stages/ad-trends";
 import { runCompetitorIntelligence } from "@/lib/research/stages/competitor-intelligence";
 import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
 import { runEnrichedMarketing } from "@/lib/research/stages/marketing-enriched";
@@ -23,8 +24,9 @@ import {
   saveResearchJob,
 } from "@/lib/store/research-jobs";
 import { getProfile } from "@/lib/store/settings";
-import { saveSnapshot } from "@/lib/store/snapshots";
+import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type {
+  CompetitorSnapshot,
   DemandSignal,
   FinancialAssumptions,
   FinancialSnapshot,
@@ -295,6 +297,12 @@ export async function startResearchPipeline(jobId: string): Promise<void> {
     await runStage("social_strategy", async () => {
       const social = await runSocialStrategy(profile, jobId);
       await saveSnapshot("marketing_social", social);
+    });
+
+    await runStage("ad_trends", async () => {
+      const competitors = await getSnapshot<CompetitorSnapshot>("competitors");
+      const ads = await runAdTrends(profile, competitors, jobId);
+      await saveSnapshot("ads", ads);
     });
 
     await runStage("investment_allocation", async () => {

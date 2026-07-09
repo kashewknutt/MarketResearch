@@ -5,10 +5,23 @@ import {
 import { linkedInRestHeaders } from "@/lib/integrations/linkedin-api";
 import { getLinkedInAccessToken, linkedInAuthorizedFetch } from "@/lib/integrations/linkedin-oauth";
 import { redditEnvPresence, verifyRedditApi } from "@/lib/integrations/reddit";
+import { verifyYoutubeApi, youtubeEnvPresence } from "@/lib/integrations/youtube";
 
 export type IntegrationPresence = "none" | "partial" | "full";
 
 export { redditEnvPresence };
+
+export function youtubePresence(): "none" | "full" {
+  return youtubeEnvPresence() ? "full" : "none";
+}
+
+export async function verifyYoutubeConnection(): Promise<{
+  ok: boolean;
+  message: string;
+  detail?: string;
+}> {
+  return verifyYoutubeApi();
+}
 
 export function linkedinEnvPresence(): IntegrationPresence {
   const access = process.env.LINKEDIN_ACCESS_TOKEN?.trim();

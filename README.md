@@ -111,6 +111,7 @@ Add these to `.env.local` when you want extra signals. The app still runs withou
 | `LINKEDIN_REFRESH_TOKEN` | **Advertising API** — used to refresh access token when it expires |
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | Required for automatic token refresh |
 | `LINKEDIN_AD_ACCOUNT_ID` | **Advertising API** — sponsored ad account ID for real spend in **Financial Analysis** |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key — real trending videos for **Ads & Content** research |
 | `GEMINI_BILLING_TIER` | `paid` (default) or `free` — affects cost estimates on **API Costs** |
 | `MARKET_RESEARCH_DATA_DIR` | Override where SQLite and snapshots are stored (Electron sets this automatically in production) |
 
@@ -323,6 +324,7 @@ Add your company **LinkedIn page URL** in onboarding **Online presence** — use
 | `LINKEDIN_REFRESH_TOKEN` | No* | Refresh expired access tokens |
 | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | No* | OAuth refresh |
 | `LINKEDIN_AD_ACCOUNT_ID` | No* | Sponsored ad account ID |
+| `YOUTUBE_API_KEY` | No | Real trending YouTube videos in Ads & Content research |
 
 ---
 
@@ -375,6 +377,7 @@ Stop the server, delete the `./data` folder (or your `MARKET_RESEARCH_DATA_DIR`)
 - **Leads** — Discovered companies with fit scores and sources  
 - **Financial Analysis** — Live MRR/expense chart, editable expense line items, LinkedIn ad panel when available  
 - **Marketing** — Campaigns and social strategy tabs  
+- **Ads & Content** — Trending ads/content ideas (LinkedIn, Instagram, YouTube) for your brand and competitors, with tracked/discovered competitor lists  
 - **Strategy & Investment** — ICP, priorities, spend recommendations  
 - **Research Sources** — Citations and AI traces  
 - **API Costs** — Per-call cost estimates  

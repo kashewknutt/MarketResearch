@@ -394,6 +394,62 @@ export interface CompetitorSnapshot {
   provenance: Provenance;
 }
 
+export type AdFormat =
+  | "reel"
+  | "short"
+  | "meme"
+  | "static_post"
+  | "carousel"
+  | "long_video"
+  | "story"
+  | "ad_creative";
+
+export interface TrendingAdExample {
+  id: string;
+  platform: string;
+  brandName: string;
+  isOwnBrand: boolean;
+  format: AdFormat;
+  title: string;
+  description: string;
+  whyTrending: string;
+  hook?: string;
+  engagementSignal?: string;
+  url?: string;
+  thumbnailUrl?: string;
+  publishedAt?: string;
+  citations: Citation[];
+}
+
+export interface AdIdea {
+  id: string;
+  platform: string;
+  format: AdFormat;
+  title: string;
+  hook: string;
+  concept: string;
+  scriptOrCaption: string;
+  whyThisWorks: string;
+  inspiredBy?: string;
+  priority: "high" | "medium" | "low";
+  provenance: Provenance;
+}
+
+export interface CompetitorAdActivity {
+  competitorName: string;
+  isDiscovered: boolean;
+  examples: TrendingAdExample[];
+}
+
+export interface AdTrendsSnapshot {
+  trackedCompetitors: string[];
+  discoveredCompetitors: string[];
+  trendingNow: TrendingAdExample[];
+  ideasForYou: AdIdea[];
+  competitorActivity: CompetitorAdActivity[];
+  provenance: Provenance;
+}
+
 export interface DashboardMetrics {
   currentMrr: number;
   targetMrr: number;
@@ -442,6 +498,7 @@ export type ResearchStageId =
   | "financial_modeling"
   | "marketing_planning"
   | "social_strategy"
+  | "ad_trends"
   | "investment_allocation";
 
 export interface ResearchStage {
@@ -476,6 +533,7 @@ export const RESEARCH_STAGE_DEFINITIONS: Array<{
   { id: "financial_modeling", label: "Building financial projections" },
   { id: "marketing_planning", label: "Creating marketing recommendations" },
   { id: "social_strategy", label: "Building social platform playbooks" },
+  { id: "ad_trends", label: "Researching trending ads & content ideas" },
   { id: "investment_allocation", label: "Planning investment allocation" },
 ];
 

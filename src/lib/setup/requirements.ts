@@ -17,6 +17,8 @@ import {
   redditEnvPresence,
   verifyLinkedInConnection,
   verifyRedditConnection,
+  verifyYoutubeConnection,
+  youtubePresence,
 } from "@/lib/setup/integration-checks";
 import type {
   RequirementCheckResult,
@@ -395,6 +397,33 @@ async function checkLinkedInOptional(): Promise<RequirementCheckResult> {
   );
 }
 
+async function checkYoutubeOptional(): Promise<RequirementCheckResult> {
+  const presence = youtubePresence();
+  const docsUrl = "https://console.cloud.google.com/apis/library/youtube.googleapis.com";
+
+  if (presence === "none") {
+    return checkSkipped(
+      "youtube_optional",
+      "YouTube Data API (optional)",
+      "Fetches real trending videos for Ads & Content research.",
+      "Skipped — no YOUTUBE_API_KEY in .env. Add one (see README) for real YouTube trend data; Ads & Content still works via Gemini search alone.",
+      { actionLabel: "Enable YouTube Data API v3", actionUrl: docsUrl },
+    );
+  }
+
+  const result = await verifyYoutubeConnection();
+  return check(
+    "youtube_optional",
+    "YouTube Data API (optional)",
+    "Fetches real trending videos for Ads & Content research.",
+    result.ok,
+    result.message,
+    result.ok
+      ? { detail: result.detail }
+      : { actionLabel: "Enable YouTube Data API v3", actionUrl: docsUrl, detail: result.detail },
+  );
+}
+
 export async function runSetupRequirementsCheck(): Promise<SetupRequirementsReport> {
   const checks: RequirementCheckResult[] = [];
 
@@ -410,6 +439,7 @@ export async function runSetupRequirementsCheck(): Promise<SetupRequirementsRepo
 
   checks.push(await checkRedditOptional());
   checks.push(await checkLinkedInOptional());
+  checks.push(await checkYoutubeOptional());
 
   const requiredChecks = checks.filter((c) =>
     REQUIRED_REQUIREMENT_IDS.includes(c.id),

@@ -12,6 +12,7 @@ const VALID: RefreshSection[] = [
   "strategy",
   "investment",
   "competitors",
+  "ads",
   "sources",
   "api-costs",
 ];

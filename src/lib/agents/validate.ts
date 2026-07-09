@@ -138,6 +138,53 @@ export const financialMetricWorkbookAiSchema = z.object({
     .optional(),
 });
 
+const adFormatSchema = z.enum([
+  "reel",
+  "short",
+  "meme",
+  "static_post",
+  "carousel",
+  "long_video",
+  "story",
+  "ad_creative",
+]);
+
+export const trendingAdExampleSchema = z.object({
+  id: z.string(),
+  platform: z.string(),
+  brandName: z.string(),
+  isOwnBrand: z.boolean(),
+  format: adFormatSchema,
+  title: z.string(),
+  description: z.string(),
+  whyTrending: z.string(),
+  hook: z.string().optional(),
+  engagementSignal: z.string().optional(),
+  url: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  publishedAt: z.string().optional(),
+  citations: z.array(citationSchema),
+});
+
+export const adIdeaSchema = z.object({
+  id: z.string(),
+  platform: z.string(),
+  format: adFormatSchema,
+  title: z.string(),
+  hook: z.string(),
+  concept: z.string(),
+  scriptOrCaption: z.string(),
+  whyThisWorks: z.string(),
+  inspiredBy: z.string().optional(),
+  priority: z.enum(["high", "medium", "low"]),
+});
+
+export const competitorAdActivitySchema = z.object({
+  competitorName: z.string(),
+  isDiscovered: z.boolean(),
+  examples: z.array(trendingAdExampleSchema),
+});
+
 export function safeParse<T>(schema: z.ZodType<T>, data: unknown): T | null {
   const result = schema.safeParse(data);
   return result.success ? result.data : null;

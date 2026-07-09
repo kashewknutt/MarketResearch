@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { requireGeminiReady } from "@/lib/ai/gemini";
 import { createAndStartResearchJob } from "@/lib/research/orchestrator";
+import { runAdTrends } from "@/lib/research/stages/ad-trends";
 import { runCompetitorIntelligence } from "@/lib/research/stages/competitor-intelligence";
 import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
 import { runEnrichedMarketing } from "@/lib/research/stages/marketing-enriched";
@@ -10,7 +11,7 @@ import { runSocialStrategy } from "@/lib/research/stages/social-strategy";
 import { ensureFullProjectQueues } from "@/lib/research/project-generator";
 import { getProfile } from "@/lib/store/settings";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
-import type { FinancialSnapshot } from "@/lib/types/domain";
+import type { AdTrendsSnapshot, CompetitorSnapshot, FinancialSnapshot } from "@/lib/types/domain";
 import { generateStructuredJson } from "@/lib/ai/gemini";
 import { createProvenance } from "@/lib/db/provenance";
 import { investmentPrompt, strategyPrompt } from "@/lib/ai/prompts";
@@ -144,6 +145,20 @@ export async function runSectionRefresh(
     case "competitors": {
       const competitors = await runCompetitorIntelligence(profile, jobId);
       await saveSnapshot("competitors", competitors);
+      break;
+    }
+    case "ads": {
+      const [competitors, existingAds] = await Promise.all([
+        getSnapshot<CompetitorSnapshot>("competitors"),
+        getSnapshot<AdTrendsSnapshot>("ads"),
+      ]);
+      const ads = await runAdTrends(
+        profile,
+        competitors,
+        jobId,
+        existingAds?.trackedCompetitors,
+      );
+      await saveSnapshot("ads", ads);
       break;
     }
     default:

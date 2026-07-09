@@ -6,7 +6,8 @@ export type RequirementId =
   | "billing_quota"
   | "local_storage"
   | "reddit_optional"
-  | "linkedin_optional";
+  | "linkedin_optional"
+  | "youtube_optional";
 
 /** Required for onboarding; optional integration checks never block continue. */
 export const REQUIRED_REQUIREMENT_IDS: RequirementId[] = [
