@@ -149,6 +149,15 @@ const adFormatSchema = z.enum([
   "ad_creative",
 ]);
 
+const engagementMetricsSchema = z.object({
+  viewCount: z.number().optional(),
+  likeCount: z.number().optional(),
+  commentCount: z.number().optional(),
+  shareCount: z.number().optional(),
+});
+
+const adSourceTypeSchema = z.enum(["scraped", "ai_estimate"]);
+
 export const trendingAdExampleSchema = z.object({
   id: z.string(),
   platform: z.string(),
@@ -160,6 +169,9 @@ export const trendingAdExampleSchema = z.object({
   whyTrending: z.string(),
   hook: z.string().optional(),
   engagementSignal: z.string().optional(),
+  metrics: engagementMetricsSchema.optional(),
+  sourceType: adSourceTypeSchema.optional(),
+  fetchedAt: z.string().optional(),
   url: z.string().optional(),
   thumbnailUrl: z.string().optional(),
   publishedAt: z.string().optional(),
@@ -173,6 +185,9 @@ export const adIdeaSourceRefSchema = z.object({
   platform: z.string().optional(),
   brandName: z.string().optional(),
   engagementSignal: z.string().optional(),
+  metrics: engagementMetricsSchema.optional(),
+  sourceType: adSourceTypeSchema.optional(),
+  fetchedAt: z.string().optional(),
   whyPicked: z.string(),
 });
 

@@ -13,9 +13,11 @@ import {
 } from "@/lib/ai/gemini";
 import { getDataDir } from "@/lib/db/paths";
 import {
+  apifyEnvPresence,
   linkedinEnvPresence,
   linkedInPublishEnvPresence,
   redditEnvPresence,
+  verifyApifyConnection,
   verifyLinkedInConnection,
   verifyLinkedInPublishConnection,
   verifyRedditConnection,
@@ -454,6 +456,32 @@ async function checkLinkedInPublishOptional(): Promise<RequirementCheckResult> {
   );
 }
 
+async function checkApifyOptional(): Promise<RequirementCheckResult> {
+  const docsUrl = "https://apify.com/apify/instagram-scraper";
+
+  if (!apifyEnvPresence()) {
+    return checkSkipped(
+      "apify_optional",
+      "Apify (optional)",
+      "Real, verified Instagram and LinkedIn post data (views/likes/comments) for Ads & Content.",
+      "Skipped — no APIFY_API_TOKEN in .env. Add one (see README) for verified Instagram/LinkedIn data; Ads & Content still works via Gemini search alone otherwise.",
+      { actionLabel: "Apify Instagram Scraper", actionUrl: docsUrl },
+    );
+  }
+
+  const result = await verifyApifyConnection();
+  return check(
+    "apify_optional",
+    "Apify (optional)",
+    "Real, verified Instagram and LinkedIn post data (views/likes/comments) for Ads & Content.",
+    result.ok,
+    result.message,
+    result.ok
+      ? { detail: result.detail }
+      : { actionLabel: "Apify Instagram Scraper", actionUrl: docsUrl, detail: result.detail },
+  );
+}
+
 export async function runSetupRequirementsCheck(): Promise<SetupRequirementsReport> {
   const checks: RequirementCheckResult[] = [];
 
@@ -471,6 +499,7 @@ export async function runSetupRequirementsCheck(): Promise<SetupRequirementsRepo
   checks.push(await checkLinkedInOptional());
   checks.push(await checkYoutubeOptional());
   checks.push(await checkLinkedInPublishOptional());
+  checks.push(await checkApifyOptional());
 
   const requiredChecks = checks.filter((c) =>
     REQUIRED_REQUIREMENT_IDS.includes(c.id),

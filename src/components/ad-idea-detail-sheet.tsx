@@ -2,7 +2,64 @@
 
 import { useEffect, useState } from "react";
 import { CitationList } from "@/components/ui/citation-list";
-import type { AdIdea, AdIdeaStatus, AdTrendsSnapshot, TrendingAdExample } from "@/lib/types/domain";
+import type {
+  AdIdea,
+  AdIdeaStatus,
+  AdSourceType,
+  AdTrendsSnapshot,
+  EngagementMetrics,
+  TrendingAdExample,
+} from "@/lib/types/domain";
+
+function VerifiedBadge({
+  sourceType,
+  platform,
+  fetchedAt,
+}: {
+  sourceType?: AdSourceType;
+  platform?: string;
+  fetchedAt?: string;
+}) {
+  if (sourceType === "scraped") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
+        ✓ Verified{platform ? ` via ${platform}` : ""}
+        {fetchedAt ? ` · as of ${new Date(fetchedAt).toLocaleDateString()}` : ""}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+      AI-estimated
+    </span>
+  );
+}
+
+function MetricsTable({ metrics }: { metrics?: EngagementMetrics }) {
+  if (!metrics) return null;
+  const rows: Array<[string, number | undefined]> = [
+    ["Views", metrics.viewCount],
+    ["Likes", metrics.likeCount],
+    ["Comments", metrics.commentCount],
+    ["Shares", metrics.shareCount],
+  ].filter(([, v]) => v != null) as Array<[string, number]>;
+  if (rows.length === 0) return null;
+
+  return (
+    <table className="mt-2 w-full text-xs">
+      <tbody>
+        {rows.map(([label, value]) => (
+          <tr key={label} className="border-t border-slate-100">
+            <td className="py-1 text-slate-500">{label}</td>
+            <td className="py-1 text-right font-medium text-slate-800">
+              {new Intl.NumberFormat().format(value as number)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 interface AdIdeaDetailSheetProps {
   idea: AdIdea | null;
@@ -160,7 +217,14 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
 
         {idea.sourceRef && (
           <section className="rounded-lg border border-amber-100 bg-amber-50/40 p-4">
-            <p className="text-sm font-medium text-slate-800">Source</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-slate-800">Source</p>
+              <VerifiedBadge
+                sourceType={idea.sourceRef.sourceType}
+                platform={idea.sourceRef.platform}
+                fetchedAt={idea.sourceRef.fetchedAt}
+              />
+            </div>
             {idea.sourceRef.url ? (
               <a
                 href={idea.sourceRef.url}
@@ -175,8 +239,9 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
             )}
             <p className="mt-0.5 text-xs text-slate-500">
               {[idea.sourceRef.brandName, idea.sourceRef.platform].filter(Boolean).join(" · ")}
-              {idea.sourceRef.engagementSignal ? ` · ${idea.sourceRef.engagementSignal}` : ""}
+              {idea.sourceRef.metrics ? "" : idea.sourceRef.engagementSignal ? ` · ${idea.sourceRef.engagementSignal}` : ""}
             </p>
+            <MetricsTable metrics={idea.sourceRef.metrics} />
             <p className="mt-2 text-xs text-slate-700">{idea.sourceRef.whyPicked}</p>
           </section>
         )}
@@ -361,14 +426,21 @@ export function TrendingAdDetailSheet({ example, onClose }: TrendingAdDetailShee
         </button>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
-        <span
-          className={`inline-block rounded-full px-2 py-0.5 text-xs ${
-            example.isOwnBrand ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
-          }`}
-        >
-          {example.isOwnBrand ? "Your brand" : example.brandName} · {example.platform} ·{" "}
-          {example.format.replace("_", " ")}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`inline-block rounded-full px-2 py-0.5 text-xs ${
+              example.isOwnBrand ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
+            }`}
+          >
+            {example.isOwnBrand ? "Your brand" : example.brandName} · {example.platform} ·{" "}
+            {example.format.replace("_", " ")}
+          </span>
+          <VerifiedBadge
+            sourceType={example.sourceType}
+            platform={example.platform}
+            fetchedAt={example.fetchedAt}
+          />
+        </div>
 
         <p className="text-xs text-slate-600">{example.description}</p>
 
@@ -384,8 +456,12 @@ export function TrendingAdDetailSheet({ example, onClose }: TrendingAdDetailShee
           <p className="mt-1 text-xs text-slate-700">{example.whyTrending}</p>
         </section>
 
-        {example.engagementSignal && (
-          <p className="text-sm font-semibold text-violet-700">{example.engagementSignal}</p>
+        {example.metrics ? (
+          <MetricsTable metrics={example.metrics} />
+        ) : (
+          example.engagementSignal && (
+            <p className="text-sm font-semibold text-violet-700">{example.engagementSignal}</p>
+          )
         )}
 
         {example.url && (

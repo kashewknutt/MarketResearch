@@ -1,3 +1,5 @@
+import { runApifyActor } from "@/lib/integrations/apify";
+
 export interface YoutubeVideoSignal {
   videoId: string;
   title: string;
@@ -6,6 +8,7 @@ export interface YoutubeVideoSignal {
   publishedAt: string;
   viewCount?: number;
   likeCount?: number;
+  commentCount?: number;
   thumbnailUrl?: string;
   url: string;
 }
@@ -65,7 +68,7 @@ interface YtSearchItem {
 
 interface YtVideoStatsItem {
   id: string;
-  statistics?: { viewCount?: string; likeCount?: string };
+  statistics?: { viewCount?: string; likeCount?: string; commentCount?: string };
 }
 
 async function ytFetch(path: string, params: Record<string, string>) {
@@ -89,6 +92,7 @@ function toSignal(item: YtSearchItem, stats?: YtVideoStatsItem): YoutubeVideoSig
     publishedAt: item.snippet.publishedAt ?? "",
     viewCount: stats?.statistics?.viewCount ? Number(stats.statistics.viewCount) : undefined,
     likeCount: stats?.statistics?.likeCount ? Number(stats.statistics.likeCount) : undefined,
+    commentCount: stats?.statistics?.commentCount ? Number(stats.statistics.commentCount) : undefined,
     thumbnailUrl: item.snippet.thumbnails?.medium?.url,
     url: `https://www.youtube.com/watch?v=${videoId}`,
   };
@@ -158,4 +162,46 @@ export async function searchChannelVideos(
     console.warn(`YouTube channel search failed for "${channelOrBrandName}":`, err);
     return [];
   }
+}
+
+interface RawApifyYoutubeItem {
+  url?: string;
+  title?: string;
+  text?: string;
+  channelName?: string;
+  date?: string;
+  viewCount?: number;
+  likes?: number;
+  commentsCount?: number;
+  thumbnailUrl?: string;
+  id?: string;
+}
+
+/**
+ * Fallback used only when YOUTUBE_API_KEY is unset but APIFY_API_TOKEN is present,
+ * so the real-data pipeline can run off a single Apify token.
+ */
+export async function fetchTrendingVideosViaApify(
+  query: string,
+  limit = 8,
+): Promise<YoutubeVideoSignal[]> {
+  const items = await runApifyActor<RawApifyYoutubeItem>("streamers~youtube-scraper", {
+    searchKeywords: query,
+    maxResults: limit,
+  });
+
+  return items
+    .filter((i): i is RawApifyYoutubeItem & { url: string; id: string } => Boolean(i.url && i.id))
+    .map((i) => ({
+      videoId: i.id,
+      title: i.title ?? "",
+      description: i.text ?? "",
+      channelTitle: i.channelName ?? "",
+      publishedAt: i.date ?? "",
+      viewCount: i.viewCount,
+      likeCount: i.likes,
+      commentCount: i.commentsCount,
+      thumbnailUrl: i.thumbnailUrl,
+      url: i.url,
+    }));
 }

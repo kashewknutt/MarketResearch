@@ -404,6 +404,16 @@ export type AdFormat =
   | "story"
   | "ad_creative";
 
+export interface EngagementMetrics {
+  viewCount?: number;
+  likeCount?: number;
+  commentCount?: number;
+  shareCount?: number;
+}
+
+/** "scraped" = pulled directly from a real platform via API/Apify; "ai_estimate" = Gemini search-grounded guess. */
+export type AdSourceType = "scraped" | "ai_estimate";
+
 export interface TrendingAdExample {
   id: string;
   platform: string;
@@ -415,6 +425,9 @@ export interface TrendingAdExample {
   whyTrending: string;
   hook?: string;
   engagementSignal?: string;
+  metrics?: EngagementMetrics;
+  sourceType: AdSourceType;
+  fetchedAt?: string;
   url?: string;
   thumbnailUrl?: string;
   publishedAt?: string;
@@ -430,7 +443,16 @@ export interface AdIdeaSourceRef {
   platform?: string;
   brandName?: string;
   engagementSignal?: string;
+  metrics?: EngagementMetrics;
+  sourceType?: AdSourceType;
+  fetchedAt?: string;
   whyPicked: string;
+}
+
+export interface CompetitorSocialHandle {
+  competitorName: string;
+  instagramHandle?: string;
+  linkedinUrl?: string;
 }
 
 export interface AdCreativeConstraints {
@@ -494,6 +516,7 @@ export interface CompetitorAdActivity {
 export interface AdTrendsSnapshot {
   trackedCompetitors: string[];
   discoveredCompetitors: string[];
+  competitorSocialHandles: CompetitorSocialHandle[];
   trendingNow: TrendingAdExample[];
   ideasForYou: AdIdea[];
   competitorActivity: CompetitorAdActivity[];

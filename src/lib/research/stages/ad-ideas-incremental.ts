@@ -94,7 +94,8 @@ Return JSON:
 
   const newExamples: TrendingAdExample[] = (result.data.newExamples ?? [])
     .map((e) => safeParse(trendingAdExampleSchema, withId(e)))
-    .filter((e): e is TrendingAdExample => e !== null);
+    .filter((e): e is TrendingAdExample => e !== null)
+    .map((e) => ({ ...e, sourceType: e.sourceType ?? "ai_estimate" }));
 
   const exampleIndex = buildExampleIndex(
     [...existing.trendingNow, ...newExamples],

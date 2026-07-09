@@ -10,7 +10,12 @@ import {
   TrendingAdDetailSheet,
 } from "@/components/ad-idea-detail-sheet";
 import { GeminiFallback } from "@/components/gemini-fallback";
-import type { AdIdea, AdTrendsSnapshot, TrendingAdExample } from "@/lib/types/domain";
+import type {
+  AdIdea,
+  AdTrendsSnapshot,
+  CompetitorSocialHandle,
+  TrendingAdExample,
+} from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
 const ideaCol = createColumnHelper<AdIdea>();
@@ -23,6 +28,7 @@ const STATUS_LABELS: Record<string, string> = {
   published_linkedin: "Published (LinkedIn)",
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ideaColumns: ColumnDef<AdIdea, any>[] = [
   ideaCol.accessor("platform", { header: "Platform" }),
   ideaCol.accessor("format", {
@@ -37,6 +43,7 @@ const ideaColumns: ColumnDef<AdIdea, any>[] = [
   }),
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const exampleColumns: ColumnDef<TrendingAdExample, any>[] = [
   exampleCol.accessor("platform", { header: "Platform" }),
   exampleCol.display({
@@ -53,6 +60,19 @@ const exampleColumns: ColumnDef<TrendingAdExample, any>[] = [
     header: "Engagement",
     cell: (i) => i.getValue() ?? "—",
   }),
+  exampleCol.accessor("sourceType", {
+    header: "Source",
+    cell: (i) =>
+      i.getValue() === "scraped" ? (
+        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
+          ✓ Verified
+        </span>
+      ) : (
+        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+          AI-estimated
+        </span>
+      ),
+  }),
 ];
 
 export default function AdsPage() {
@@ -65,6 +85,9 @@ export default function AdsPage() {
   const [generateCount, setGenerateCount] = useState(10);
   const [generatingMore, setGeneratingMore] = useState(false);
   const [generateMoreError, setGenerateMoreError] = useState<string | null>(null);
+  const [handleDrafts, setHandleDrafts] = useState<Record<string, { instagramHandle: string; linkedinUrl: string }>>(
+    {},
+  );
 
   const load = useCallback(() => {
     fetch("/api/ads")
@@ -84,6 +107,19 @@ export default function AdsPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ trackedCompetitors }),
+      });
+      const data = await res.json();
+      if (data.ads) setAds(data.ads);
+    },
+    [],
+  );
+
+  const saveCompetitorSocialHandles = useCallback(
+    async (competitorSocialHandles: CompetitorSocialHandle[]) => {
+      const res = await fetch("/api/ads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competitorSocialHandles }),
       });
       const data = await res.json();
       if (data.ads) setAds(data.ads);
@@ -226,6 +262,66 @@ export default function AdsPage() {
               </button>
             </form>
 
+            {ads.trackedCompetitors.length > 0 && (
+              <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+                <p className="text-xs font-medium text-slate-600">
+                  Social handles (optional — enables real Instagram/LinkedIn data for that
+                  competitor instead of AI estimates)
+                </p>
+                {ads.trackedCompetitors.map((name) => {
+                  const saved = (ads.competitorSocialHandles ?? []).find(
+                    (h) => h.competitorName === name,
+                  );
+                  const draft = handleDrafts[name] ?? {
+                    instagramHandle: saved?.instagramHandle ?? "",
+                    linkedinUrl: saved?.linkedinUrl ?? "",
+                  };
+                  return (
+                    <div key={name} className="flex flex-wrap items-center gap-2 text-xs">
+                      <span className="w-32 shrink-0 truncate text-slate-600">{name}</span>
+                      <input
+                        value={draft.instagramHandle}
+                        onChange={(e) =>
+                          setHandleDrafts((prev) => ({
+                            ...prev,
+                            [name]: { ...draft, instagramHandle: e.target.value },
+                          }))
+                        }
+                        placeholder="Instagram handle (e.g. brandname)"
+                        className="flex-1 rounded-lg border border-slate-200 px-2 py-1"
+                      />
+                      <input
+                        value={draft.linkedinUrl}
+                        onChange={(e) =>
+                          setHandleDrafts((prev) => ({
+                            ...prev,
+                            [name]: { ...draft, linkedinUrl: e.target.value },
+                          }))
+                        }
+                        placeholder="LinkedIn profile/company URL"
+                        className="flex-1 rounded-lg border border-slate-200 px-2 py-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const others = (ads.competitorSocialHandles ?? []).filter(
+                            (h) => h.competitorName !== name,
+                          );
+                          saveCompetitorSocialHandles([
+                            ...others,
+                            { competitorName: name, ...draft },
+                          ]);
+                        }}
+                        className="rounded-lg bg-slate-100 px-2 py-1 text-slate-700 hover:bg-slate-200"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {ads.discoveredCompetitors.length > 0 && (
               <div className="mt-4">
                 <p className="text-xs font-medium text-slate-600">
@@ -351,7 +447,18 @@ export default function AdsPage() {
                       onClick={() => setSelectedExample(ex)}
                       className="block w-full rounded-lg border border-slate-100 p-3 text-left text-xs hover:bg-violet-50/30"
                     >
-                      <p className="font-medium text-slate-800">{ex.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-800">{ex.title}</p>
+                        {ex.sourceType === "scraped" ? (
+                          <span className="rounded-full bg-emerald-50 px-1.5 py-0.5 text-xs text-emerald-800">
+                            ✓ Verified
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800">
+                            AI-estimated
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-1 text-slate-500">
                         {ex.platform} · {ex.format.replace("_", " ")}
                         {ex.engagementSignal ? ` · ${ex.engagementSignal}` : ""}

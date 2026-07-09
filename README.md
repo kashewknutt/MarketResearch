@@ -113,6 +113,7 @@ Add these to `.env.local` when you want extra signals. The app still runs withou
 | `LINKEDIN_AD_ACCOUNT_ID` | **Advertising API** — sponsored ad account ID for real spend in **Financial Analysis** |
 | `LINKEDIN_PERSON_URN` | **Share on LinkedIn** — your `urn:li:person:{id}`, needed to publish posts from **Ads & Content** |
 | `YOUTUBE_API_KEY` | YouTube Data API v3 key — real trending videos for **Ads & Content** research |
+| `APIFY_API_TOKEN` | Apify token — real, verified Instagram/LinkedIn post data (views/likes/comments) in **Ads & Content** |
 | `GEMINI_BILLING_TIER` | `paid` (default) or `free` — affects cost estimates on **API Costs** |
 | `MARKET_RESEARCH_DATA_DIR` | Override where SQLite and snapshots are stored (Electron sets this automatically in production) |
 
@@ -335,6 +336,30 @@ This is a **separate, optional** capability from the read-only Advertising API i
 
 ---
 
+### Apify — real, verified Instagram and LinkedIn data (optional)
+
+Without Apify, **Ads & Content** researches LinkedIn and Instagram trends entirely through Gemini's search grounding — plausible and cited, but not actual scraped posts, and engagement numbers are AI-estimated, not verified. Apify closes that gap with real scraped data. YouTube is unaffected — it already uses the free, official YouTube Data API (see below) regardless of Apify.
+
+1. Sign up at [apify.com](https://apify.com) (free tier includes ~$5/month platform credit).
+2. Go to **Settings → Integrations** and copy your **API token**.
+3. Add to `.env.local`:
+   ```env
+   APIFY_API_TOKEN=your_apify_token_here
+   ```
+4. Restart the dev server. Check `/setup` for the new "Apify (optional)" status — this check is free (no actor run).
+
+**What this enables:**
+- Real Instagram posts (your brand, tracked competitors with a handle set in **Ads & Content → Overview**, and one hashtag-based market search) — real like/comment/view counts (views only for reels/videos, Instagram doesn't expose view counts on static posts).
+- Real LinkedIn posts (your brand, tracked competitors with a URL set in Overview, and one keyword-based market search) — real like/comment/share counts. **LinkedIn does not expose a public view/impression count for posts** — this is a platform limitation, not a bug, and the UI never fabricates one.
+- **Neither platform has a "dislikes" concept** — it doesn't exist on Instagram or LinkedIn, so it's never shown.
+- A fallback for **YouTube** itself: if `YOUTUBE_API_KEY` is unset but `APIFY_API_TOKEN` is set, trending video search falls back to an Apify YouTube actor, so the whole pipeline can run off just one Apify token if you don't want a separate Google Cloud key.
+
+**Cost:** pay-per-result, no subscription required. Results are capped per refresh (a handful of posts per brand/competitor/platform) to keep this cheap — typically a few cents to around $0.30 per "Refresh ad trends" run, depending on how many competitor handles you've configured. Pricing is roughly $1.50–2.70 per 1,000 scraped items.
+
+**In the UI:** every trending example and idea source shows a **"✓ Verified via {platform}"** badge (real, scraped data with an "as of" timestamp) or an **"AI-estimated"** badge (Gemini search-grounded, no scrape match) — so it's always clear which numbers are real and which are inferred.
+
+---
+
 ## Environment reference
 
 | Variable | Required | Description |
@@ -349,6 +374,7 @@ This is a **separate, optional** capability from the read-only Advertising API i
 | `LINKEDIN_AD_ACCOUNT_ID` | No* | Sponsored ad account ID |
 | `LINKEDIN_PERSON_URN` | No | Enables publishing generated ideas to LinkedIn from Ads & Content |
 | `YOUTUBE_API_KEY` | No | Real trending YouTube videos in Ads & Content research |
+| `APIFY_API_TOKEN` | No | Real, verified Instagram/LinkedIn post data (views/likes/comments) in Ads & Content |
 
 ---
 

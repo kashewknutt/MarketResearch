@@ -7,6 +7,9 @@ import { getLinkedInAccessToken, linkedInAuthorizedFetch } from "@/lib/integrati
 import { redditEnvPresence, verifyRedditApi } from "@/lib/integrations/reddit";
 import { verifyYoutubeApi, youtubeEnvPresence } from "@/lib/integrations/youtube";
 import { linkedInPersonUrnConfigured } from "@/lib/integrations/linkedin-posts";
+import { apifyEnvPresence, verifyApifyConnection } from "@/lib/integrations/apify";
+
+export { apifyEnvPresence, verifyApifyConnection };
 
 export type IntegrationPresence = "none" | "partial" | "full";
 

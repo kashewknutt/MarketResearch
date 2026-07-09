@@ -28,9 +28,35 @@ export function resolveIdeaSourceRef(
       platform: matched.platform,
       brandName: matched.brandName,
       engagementSignal: matched.engagementSignal,
+      metrics: matched.metrics,
+      sourceType: matched.sourceType,
+      fetchedAt: matched.fetchedAt,
       whyPicked: idea.sourceRef?.whyPicked ?? idea.whyThisWorks,
     };
   }
   if (idea.sourceRef) return idea.sourceRef;
-  return { title: "General market trend", whyPicked: idea.whyThisWorks };
+  return { title: "General market trend", sourceType: "ai_estimate", whyPicked: idea.whyThisWorks };
+}
+
+/**
+ * Force-overwrites metrics/url/sourceType on any parsed trendingNow/competitorActivity
+ * example whose id matches one of the real, directly-scraped entries — in case Gemini's
+ * enrichment pass altered them. Never trust the model's copy of real numbers.
+ */
+export function reassertScrapedMetrics(
+  examples: TrendingAdExample[],
+  realById: Map<string, TrendingAdExample>,
+): TrendingAdExample[] {
+  return examples.map((ex) => {
+    const real = realById.get(ex.id);
+    if (!real) return ex;
+    return {
+      ...ex,
+      url: real.url,
+      metrics: real.metrics,
+      sourceType: real.sourceType,
+      fetchedAt: real.fetchedAt,
+      engagementSignal: real.engagementSignal,
+    };
+  });
 }
