@@ -14,12 +14,22 @@ import type {
   AdIdea,
   AdTrendsSnapshot,
   CompetitorSocialHandle,
+  ContentConstraintPreset,
   TrendingAdExample,
 } from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
 const ideaCol = createColumnHelper<AdIdea>();
 const exampleCol = createColumnHelper<TrendingAdExample>();
+
+const DEFAULT_CONTENT_PRESETS: ContentConstraintPreset[] = [
+  {
+    id: "kk-bedroom",
+    name: "KK Bedroom",
+    notes:
+      "I have a table lamp, white for clean lighting. A blue bricked wallpaper with some wall plants, CDs and Vinyl records for decor. There is plenty of natural light with a choice to cover the windows with curtains. I have an iphone 17 to record for video quality. I have a video editor for post cleanup. I have a mic connected to an arm and a table chair which I'll sit on while narrating. I have 2 LED strips with leaves for decor.",
+  },
+];
 
 const STATUS_LABELS: Record<string, string> = {
   idea: "Idea",
@@ -167,6 +177,9 @@ export default function AdsPage() {
       </div>
     );
   }
+
+  const contentPresets =
+    ads.contentPresets && ads.contentPresets.length > 0 ? ads.contentPresets : DEFAULT_CONTENT_PRESETS;
 
   return (
     <div className="space-y-6">
@@ -406,6 +419,7 @@ export default function AdsPage() {
             idea={selectedIdea}
             onClose={() => setSelectedIdea(null)}
             onIdeaUpdated={handleIdeaUpdated}
+            contentPresets={contentPresets}
           />
         </div>
       )}
@@ -544,6 +558,7 @@ export default function AdsPage() {
             idea={selectedIdea}
             onClose={() => setSelectedIdea(null)}
             onIdeaUpdated={handleIdeaUpdated}
+            contentPresets={contentPresets}
           />
         </div>
       )}

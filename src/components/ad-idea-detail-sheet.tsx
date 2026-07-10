@@ -7,9 +7,12 @@ import type {
   AdIdeaStatus,
   AdSourceType,
   AdTrendsSnapshot,
+  ContentConstraintPreset,
   EngagementMetrics,
   TrendingAdExample,
 } from "@/lib/types/domain";
+
+const TIME_OF_DAY_OPTIONS = ["Early morning", "Morning", "Midday", "Afternoon", "Evening", "Night"];
 
 function VerifiedBadge({
   sourceType,
@@ -65,6 +68,7 @@ interface AdIdeaDetailSheetProps {
   idea: AdIdea | null;
   onClose: () => void;
   onIdeaUpdated: (ads: AdTrendsSnapshot) => void;
+  contentPresets: ContentConstraintPreset[];
 }
 
 const STATUS_LABELS: Record<AdIdeaStatus, string> = {
@@ -74,8 +78,13 @@ const STATUS_LABELS: Record<AdIdeaStatus, string> = {
   published_linkedin: "Published (LinkedIn)",
 };
 
-export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetailSheetProps) {
+export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated, contentPresets }: AdIdeaDetailSheetProps) {
   const [constraintsNotes, setConstraintsNotes] = useState("");
+  const [timeOfDay, setTimeOfDay] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState("");
+  const [newPresetName, setNewPresetName] = useState("");
+  const [presetSaving, setPresetSaving] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
@@ -111,6 +120,10 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
 
   useEffect(() => {
     setConstraintsNotes(idea?.generatedContent?.constraints.notes ?? "");
+    setTimeOfDay(idea?.generatedContent?.constraints.timeOfDay ?? "");
+    setSelectedPresetId("");
+    setNewPresetName("");
+    setPresetError(null);
     setGenerateError(null);
     setMarkPostedOpen(false);
     setMarkPostedUrl("");
@@ -145,7 +158,7 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
       const res = await fetch(`/api/ads/ideas/${idea.id}/content`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: constraintsNotes }),
+        body: JSON.stringify({ notes: constraintsNotes, timeOfDay: timeOfDay || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -157,6 +170,65 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
       setGenerateError("Content generation failed — check your connection and try again.");
     } finally {
       setGenerating(false);
+    }
+  }
+
+  function applyPreset(presetId: string) {
+    setSelectedPresetId(presetId);
+    const preset = contentPresets.find((p) => p.id === presetId);
+    if (preset) setConstraintsNotes(preset.notes);
+  }
+
+  async function saveCurrentAsPreset() {
+    if (!newPresetName.trim() || !constraintsNotes.trim()) return;
+    setPresetSaving(true);
+    setPresetError(null);
+    try {
+      const preset: ContentConstraintPreset = {
+        id: crypto.randomUUID(),
+        name: newPresetName.trim(),
+        notes: constraintsNotes,
+      };
+      const res = await fetch("/api/ads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentPresets: [...contentPresets, preset] }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPresetError(data.message ?? data.error ?? "Could not save preset");
+        return;
+      }
+      onIdeaUpdated(data.ads);
+      setSelectedPresetId(preset.id);
+      setNewPresetName("");
+    } catch {
+      setPresetError("Could not save preset — check your connection and try again.");
+    } finally {
+      setPresetSaving(false);
+    }
+  }
+
+  async function deletePreset(presetId: string) {
+    setPresetSaving(true);
+    setPresetError(null);
+    try {
+      const res = await fetch("/api/ads", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentPresets: contentPresets.filter((p) => p.id !== presetId) }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPresetError(data.message ?? data.error ?? "Could not delete preset");
+        return;
+      }
+      onIdeaUpdated(data.ads);
+      if (selectedPresetId === presetId) setSelectedPresetId("");
+    } catch {
+      setPresetError("Could not delete preset — check your connection and try again.");
+    } finally {
+      setPresetSaving(false);
     }
   }
 
@@ -383,9 +455,25 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
             {hasContent ? "Regenerate content" : "Generate content"}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            Set your premise/constraints (locations, budget, props available) — the script and
-            scenes will respect them.
+            Set your premise/constraints (locations, budget, props available) — used as a menu of
+            what&apos;s available, not a checklist forced into every scene.
           </p>
+
+          {contentPresets.length > 0 && (
+            <select
+              value={selectedPresetId}
+              onChange={(e) => applyPreset(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+            >
+              <option value="">Custom (write below)</option>
+              {contentPresets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <textarea
             value={constraintsNotes}
             onChange={(e) => setConstraintsNotes(e.target.value)}
@@ -393,6 +481,51 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated }: AdIdeaDetail
             rows={3}
             className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
           />
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              placeholder="Save these notes as a preset named…"
+              className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+            />
+            <button
+              type="button"
+              onClick={saveCurrentAsPreset}
+              disabled={presetSaving || !newPresetName.trim() || !constraintsNotes.trim()}
+              className="rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Save as preset
+            </button>
+            {selectedPresetId && (
+              <button
+                type="button"
+                onClick={() => deletePreset(selectedPresetId)}
+                disabled={presetSaving}
+                className="rounded-lg px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50"
+              >
+                Delete preset
+              </button>
+            )}
+          </div>
+          {presetError && <p className="mt-1 text-xs text-rose-700">{presetError}</p>}
+
+          <div className="mt-2">
+            <label className="text-xs text-slate-500">Time of day (sets natural light)</label>
+            <select
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+            >
+              <option value="">Not specified</option>
+              {TIME_OF_DAY_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             type="button"
             onClick={generateContent}

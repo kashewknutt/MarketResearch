@@ -13,6 +13,7 @@ export async function POST(
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
   const notes = typeof body.notes === "string" ? body.notes : "";
+  const timeOfDay = typeof body.timeOfDay === "string" && body.timeOfDay ? body.timeOfDay : undefined;
 
   const profile = await getProfile();
   if (!profile) {
@@ -25,7 +26,7 @@ export async function POST(
     return NextResponse.json({ error: "Idea not found" }, { status: 404 });
   }
 
-  const constraints: AdCreativeConstraints = { notes, updatedAt: new Date().toISOString() };
+  const constraints: AdCreativeConstraints = { notes, timeOfDay, updatedAt: new Date().toISOString() };
   const jobId = randomUUID();
 
   try {

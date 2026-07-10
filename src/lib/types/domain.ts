@@ -455,8 +455,15 @@ export interface CompetitorSocialHandle {
   linkedinUrl?: string;
 }
 
+export interface ContentConstraintPreset {
+  id: string;
+  name: string;
+  notes: string;
+}
+
 export interface AdCreativeConstraints {
   notes: string;
+  timeOfDay?: string;
   updatedAt: string;
 }
 
@@ -535,6 +542,7 @@ export interface AdTrendsSnapshot {
   trackedCompetitors: string[];
   discoveredCompetitors: string[];
   competitorSocialHandles: CompetitorSocialHandle[];
+  contentPresets?: ContentConstraintPreset[];
   trendingNow: TrendingAdExample[];
   ideasForYou: AdIdea[];
   competitorActivity: CompetitorAdActivity[];
