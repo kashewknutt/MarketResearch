@@ -42,17 +42,9 @@ const FEATURES = [
     title: "Research Sources",
     description: "Every citation behind every claim, always one click away.",
   },
-  {
-    title: "API Costs",
-    description: "Full visibility into what every AI call and integration costs you.",
-  },
 ];
 
 const INTEGRATIONS = [
-  {
-    name: "Google",
-    description: "Sign in securely with your Google account. No passwords to manage.",
-  },
   {
     name: "Gemini",
     description: "Research backed by live Google Search results, not guesses.",
@@ -73,16 +65,40 @@ const INTEGRATIONS = [
     name: "Apify",
     description: "Verified, real engagement numbers from Instagram and LinkedIn.",
   },
-  {
-    name: "Supabase",
-    description: "Your data, stored securely under your own private account.",
-  },
 ];
+
+function LandingNav() {
+  return (
+    <header className="sticky top-0 z-10 border-b border-slate-100 bg-white/70 backdrop-blur">
+      <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <span className="text-sm font-semibold uppercase tracking-wide text-violet-700">
+          Northstar
+        </span>
+        <div className="hidden items-center gap-8 text-sm text-slate-500 sm:flex">
+          <a href="#features" className="hover:text-slate-800">
+            Features
+          </a>
+          <a href="#integrations" className="hover:text-slate-800">
+            Integrations
+          </a>
+        </div>
+        <Link
+          href="/login"
+          className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+        >
+          Sign in
+        </Link>
+      </nav>
+    </header>
+  );
+}
 
 function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50/40 via-white to-violet-50/30">
-      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6">
+      <LandingNav />
+
+      <section className="relative flex min-h-[calc(100vh-65px)] flex-col items-center justify-center overflow-hidden px-6">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute left-1/2 top-1/3 h-96 w-96 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-200/40 blur-3xl"
@@ -115,9 +131,9 @@ function LandingPage() {
           </div>
 
           <div className="mt-16 flex items-center justify-center gap-6 text-xs text-slate-400 sm:gap-10">
-            <span>10 focused workspaces</span>
+            <span>9 focused workspaces</span>
             <span className="h-3 w-px bg-slate-200" />
-            <span>7 live integrations</span>
+            <span>5 live integrations</span>
             <span className="h-3 w-px bg-slate-200" />
             <span>Real time Google Search grounding</span>
           </div>
@@ -136,7 +152,7 @@ function LandingPage() {
         </p>
       </section>
 
-      <section className="mx-auto max-w-4xl px-6 pb-24">
+      <section id="features" className="mx-auto max-w-4xl scroll-mt-20 px-6 pb-24">
         <h2 className="text-center text-sm font-medium uppercase tracking-wide text-violet-600">
           Features
         </h2>
@@ -157,7 +173,7 @@ function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-6 pb-24">
+      <section id="integrations" className="mx-auto max-w-4xl scroll-mt-20 px-6 pb-24">
         <h2 className="text-center text-sm font-medium uppercase tracking-wide text-violet-600">
           Integrations
         </h2>
