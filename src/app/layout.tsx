@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Market Research",
+  title: "Northstar",
   description: "Real-time market research for service-based companies",
 };
 

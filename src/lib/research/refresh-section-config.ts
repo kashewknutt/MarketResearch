@@ -54,5 +54,5 @@ export function pageTitleFromPath(pathname: string): string {
     "/api-costs": "API Costs",
     "/settings": "Settings",
   };
-  return map[pathname] ?? "Market Research";
+  return map[pathname] ?? "Northstar";
 }

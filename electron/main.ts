@@ -91,7 +91,7 @@ function createWindow(url: string) {
     height: 860,
     minWidth: 960,
     minHeight: 640,
-    title: "Market Research",
+    title: "Northstar",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,

@@ -25,7 +25,7 @@ export function Sidebar({ businessName }: { businessName?: string }) {
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-slate-100 bg-[#faf9fc] px-3 py-6">
       <div className="mb-8 px-2">
         <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-          Market Research
+          Northstar
         </p>
         <h1 className="mt-1 text-sm font-semibold text-slate-800">
           {businessName ?? "Your Business"}

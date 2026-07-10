@@ -1,4 +1,4 @@
-# Market Research Platform
+# Northstar
 
 Desktop-first Next.js app for AI-assisted market research tailored to service-based companies. It stores data locally in SQLite, runs research with **Gemini** and **Google Search grounding**, and lets you edit assumptions, financial line items, and strategy outputs.
 
@@ -160,7 +160,7 @@ Used for public post search during research (via [snoowrap](https://github.com/n
 3. Click **“create another app…”** (or **“create app”**).
 
 4. Fill in the form:
-   - **name** — e.g. `Market Research Local`
+   - **name** — e.g. `Northstar Local`
    - **App type** — choose **`script`** (runs on your machine; no web redirect flow in this app)
    - **description** — optional
    - **about url** — optional
@@ -231,7 +231,7 @@ Leads and marketing copy use **Gemini + Google Search**; your company LinkedIn U
    Do **not** add Community Management API, Lead Sync, Share on LinkedIn, or other products to this app—they are unused here and some require a dedicated LinkedIn app per product.
 
 7. Open the **Auth** tab and note:
-   - **Client ID** → `LINKEDIN_CLIENT_ID` (for generating tokens; the Market Research app reads **`LINKEDIN_ACCESS_TOKEN`** at runtime)
+   - **Client ID** → `LINKEDIN_CLIENT_ID` (for generating tokens; the Northstar app reads **`LINKEDIN_ACCESS_TOKEN`** at runtime)
    - **Client Secret** → `LINKEDIN_CLIENT_SECRET` (keep secret; used only when obtaining tokens)
 
 8. Under **OAuth 2.0 settings**, add a **Redirect URL** that matches how you run the app:

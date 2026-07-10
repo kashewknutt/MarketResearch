@@ -35,7 +35,7 @@ function LoginCard() {
 
   return (
     <div className="w-full max-w-sm rounded-2xl border border-slate-100 bg-white p-8 text-center shadow-sm">
-      <p className="text-xs font-medium uppercase tracking-wide text-sky-600">Market Research</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-sky-600">Northstar</p>
       <h1 className="mt-2 text-xl font-semibold text-slate-800">Sign in</h1>
       <p className="mt-2 text-sm text-slate-500">
         Sign in with your Google account to continue.
