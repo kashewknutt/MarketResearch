@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PATHS = ["/login", "/auth/callback"];
 
 function isPublicPath(pathname: string): boolean {
+  if (pathname === "/") return true;
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return true;
   if (pathname.startsWith("/_next")) return true;
   if (pathname === "/favicon.ico") return true;
@@ -43,8 +44,8 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
   const isAuthenticated = Boolean(data?.claims);
 
   if (!isAuthenticated && !isPublicPath(request.nextUrl.pathname)) {
-    const loginUrl = new URL("/login", request.url);
-    return NextResponse.redirect(loginUrl);
+    const rootUrl = new URL("/", request.url);
+    return NextResponse.redirect(rootUrl);
   }
 
   return response;
