@@ -1,17 +1,20 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db/client";
 import { aiLogs } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getAllActiveProjects } from "@/lib/store/projects";
 import { getDemandsByRegion } from "@/lib/store/demands";
 import { getProfile } from "@/lib/store/settings";
 import { getSnapshot } from "@/lib/store/snapshots";
 
 export async function GET() {
+  const userId = await getCurrentUserId();
   const db = getDb();
   const logs = await db
     .select()
     .from(aiLogs)
+    .where(eq(aiLogs.userId, userId))
     .orderBy(desc(aiLogs.id))
     .limit(50);
 

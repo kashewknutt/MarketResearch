@@ -1,42 +1,60 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import {
+  pgTable,
+  text,
+  integer,
+  real,
+  boolean,
+  serial,
+  uuid,
+  primaryKey,
+} from "drizzle-orm/pg-core";
 
-export const appProfile = sqliteTable("app_profile", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const appProfile = pgTable("app_profile", {
+  userId: uuid("user_id").primaryKey(),
   data: text("data").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
 
-export const researchJobs = sqliteTable("research_jobs", {
+export const researchJobs = pgTable("research_jobs", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   status: text("status").notNull(),
   stages: text("stages").notNull(),
   startedAt: text("started_at").notNull(),
   completedAt: text("completed_at"),
 });
 
-export const demandSignals = sqliteTable("demand_signals", {
+export const demandSignals = pgTable("demand_signals", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   region: text("region").notNull(),
   rank: integer("rank").notNull(),
   data: text("data").notNull(),
 });
 
-export const projects = sqliteTable("projects", {
+export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   region: text("region").notNull(),
   status: text("status").notNull(),
   data: text("data").notNull(),
   sortOrder: integer("sort_order").notNull(),
 });
 
-export const snapshots = sqliteTable("snapshots", {
-  key: text("key").primaryKey(),
-  data: text("data").notNull(),
-  updatedAt: text("updated_at").notNull(),
-});
+export const snapshots = pgTable(
+  "snapshots",
+  {
+    userId: uuid("user_id").notNull(),
+    key: text("key").notNull(),
+    data: text("data").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.key] })],
+);
 
-export const aiLogs = sqliteTable("ai_logs", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const aiLogs = pgTable("ai_logs", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   task: text("task").notNull(),
   prompt: text("prompt").notNull(),
   response: text("response"),
@@ -44,23 +62,26 @@ export const aiLogs = sqliteTable("ai_logs", {
   createdAt: text("created_at").notNull(),
 });
 
-export const pricingSnapshots = sqliteTable("pricing_snapshots", {
+export const pricingSnapshots = pgTable("pricing_snapshots", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   model: text("model").notNull(),
   data: text("data").notNull(),
   fetchedAt: text("fetched_at").notNull(),
 });
 
-export const leads = sqliteTable("leads", {
+export const leads = pgTable("leads", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   region: text("region").notNull(),
   status: text("status").notNull(),
   data: text("data").notNull(),
   createdAt: text("created_at").notNull(),
 });
 
-export const researchArtifacts = sqliteTable("research_artifacts", {
+export const researchArtifacts = pgTable("research_artifacts", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   jobId: text("job_id").notNull(),
   stageId: text("stage_id").notNull(),
   stepId: text("step_id").notNull(),
@@ -68,8 +89,9 @@ export const researchArtifacts = sqliteTable("research_artifacts", {
   createdAt: text("created_at").notNull(),
 });
 
-export const apiCostEvents = sqliteTable("api_cost_events", {
+export const apiCostEvents = pgTable("api_cost_events", {
   id: text("id").primaryKey(),
+  userId: uuid("user_id").notNull(),
   createdAt: text("created_at").notNull(),
   operation: text("operation").notNull(),
   category: text("category").notNull(),
@@ -77,8 +99,8 @@ export const apiCostEvents = sqliteTable("api_cost_events", {
   region: text("region"),
   researchStage: text("research_stage"),
   model: text("model").notNull(),
-  usedGoogleSearch: integer("used_google_search", { mode: "boolean" }).notNull(),
-  success: integer("success", { mode: "boolean" }).notNull(),
+  usedGoogleSearch: boolean("used_google_search").notNull(),
+  success: boolean("success").notNull(),
   errorMessage: text("error_message"),
   durationMs: integer("duration_ms").notNull(),
   inputTokens: integer("input_tokens").notNull(),

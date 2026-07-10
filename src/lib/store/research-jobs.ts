@@ -1,6 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { researchJobs } from "@/lib/db/schema";
+import { getCurrentUserId } from "@/lib/auth/session";
 import type { ResearchJob, ResearchStage } from "@/lib/types/domain";
 import { RESEARCH_STAGE_DEFINITIONS } from "@/lib/types/domain";
 
@@ -14,16 +15,18 @@ export function createInitialStages(): ResearchStage[] {
 }
 
 export async function saveResearchJob(job: ResearchJob): Promise<void> {
+  const userId = await getCurrentUserId();
   const db = getDb();
   const stages = JSON.stringify(job.stages);
   const existing = await db
     .select()
     .from(researchJobs)
-    .where(eq(researchJobs.id, job.id))
+    .where(and(eq(researchJobs.userId, userId), eq(researchJobs.id, job.id)))
     .limit(1);
   if (existing.length === 0) {
     await db.insert(researchJobs).values({
       id: job.id,
+      userId,
       status: job.status,
       stages,
       startedAt: job.startedAt,
@@ -37,16 +40,17 @@ export async function saveResearchJob(job: ResearchJob): Promise<void> {
         stages,
         completedAt: job.completedAt ?? null,
       })
-      .where(eq(researchJobs.id, job.id));
+      .where(and(eq(researchJobs.userId, userId), eq(researchJobs.id, job.id)));
   }
 }
 
 export async function getResearchJob(id: string): Promise<ResearchJob | null> {
+  const userId = await getCurrentUserId();
   const db = getDb();
   const rows = await db
     .select()
     .from(researchJobs)
-    .where(eq(researchJobs.id, id))
+    .where(and(eq(researchJobs.userId, userId), eq(researchJobs.id, id)))
     .limit(1);
   if (rows.length === 0) return null;
   const row = rows[0];
@@ -60,8 +64,12 @@ export async function getResearchJob(id: string): Promise<ResearchJob | null> {
 }
 
 export async function getLatestResearchJob(): Promise<ResearchJob | null> {
+  const userId = await getCurrentUserId();
   const db = getDb();
-  const rows = await db.select().from(researchJobs);
+  const rows = await db
+    .select()
+    .from(researchJobs)
+    .where(eq(researchJobs.userId, userId));
   if (rows.length === 0) return null;
   const sorted = rows.sort(
     (a, b) =>

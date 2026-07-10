@@ -8,10 +8,6 @@ export function getDataDir(): string {
   return path.join(/*turbopackIgnore: true*/ process.cwd(), DEFAULT_DATA_DIR);
 }
 
-export function getDbPath(): string {
-  return path.join(getDataDir(), "market-research.db");
-}
-
 export function getCacheDir(): string {
   return path.join(getDataDir(), "cache");
 }
