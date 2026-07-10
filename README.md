@@ -49,6 +49,28 @@ npm install
 
 ---
 
+## Supabase Auth setup (required)
+
+Every route in this app requires login — there's no unauthenticated access. Auth is handled entirely by [Supabase Auth](https://supabase.com/docs/guides/auth) with **Google as the only sign-in method**. This is **login-restricted, not identity-restricted**: any Google account can sign in (there's no email allow-list), it's just that the app requires *some* authenticated session to do anything. A brand-new account simply lands in onboarding with an empty profile.
+
+1. Create a project at [supabase.com](https://supabase.com) (or use an existing one).
+2. In your Supabase project → **Settings → API**, copy the **Project URL** and **anon public** key into `.env.local`:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+   ```
+   (The service role key is only used server-side for admin lookups, e.g. the local-data backfill script — never expose it to the browser.)
+3. **Enable Google as an Auth provider:**
+   - In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create an OAuth Client ID of type **Web application**.
+   - Under **Authorized redirect URIs**, add your Supabase callback URL — find the exact value on the Google provider settings page in your Supabase dashboard (**Authentication → Providers → Google**), typically `https://<project-ref>.supabase.co/auth/v1/callback`.
+   - Copy the Client ID and Client Secret into that same Supabase dashboard page and save.
+4. Restart the dev server. Visiting any page while logged out now redirects to `/login`, which shows a single "Sign in with Google" button.
+
+No further app code is needed for auth beyond what's already built — Supabase handles the OAuth exchange; this app just checks for a valid session.
+
+---
+
 ## How to run
 
 ### Option A — Web app (recommended for first run)
