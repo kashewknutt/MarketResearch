@@ -9,7 +9,6 @@ import {
   AdIdeaDetailSheet,
   TrendingAdDetailSheet,
 } from "@/components/ad-idea-detail-sheet";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import type {
   AdIdea,
   AdTrendsSnapshot,
@@ -30,6 +29,11 @@ const DEFAULT_CONTENT_PRESETS: ContentConstraintPreset[] = [
       "I have a table lamp, white for clean lighting. A blue bricked wallpaper with some wall plants, CDs and Vinyl records for decor. There is plenty of natural light with a choice to cover the windows with curtains. I have an iphone 17 to record for video quality. I have a video editor for post cleanup. I have a mic connected to an arm and a table chair which I'll sit on while narrating. I have 2 LED strips with leaves for decor.",
   },
 ];
+
+function daysUntilPurge(deletedAt: string): number {
+  const elapsedDays = Math.floor((Date.now() - new Date(deletedAt).getTime()) / (24 * 60 * 60 * 1000));
+  return Math.max(0, 30 - elapsedDays);
+}
 
 const STATUS_LABELS: Record<string, string> = {
   idea: "Idea",
@@ -173,13 +177,21 @@ export default function AdsPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">Ads & Content</h1>
-        <GeminiFallback title="Run research to generate ad trends and content ideas" verify />
+        <p className="text-sm text-slate-500">Run research to generate ad trends and content ideas.</p>
       </div>
     );
   }
 
   const contentPresets =
     ads.contentPresets && ads.contentPresets.length > 0 ? ads.contentPresets : DEFAULT_CONTENT_PRESETS;
+  const activeIdeas = ads.ideasForYou.filter((i) => !i.deletedAt);
+  const trashedIdeas = ads.ideasForYou.filter((i) => i.deletedAt);
+
+  const restoreIdea = async (id: string) => {
+    const res = await fetch(`/api/ads/ideas/${id}/restore`, { method: "POST" });
+    const data = await res.json();
+    if (data.ads) setAds(data.ads);
+  };
 
   return (
     <div className="space-y-6">
@@ -198,6 +210,7 @@ export default function AdsPage() {
           { id: "trending", label: "Trending now" },
           { id: "competitors", label: "By competitor" },
           { id: "performance", label: "Performance" },
+          { id: "trash", label: `Trash${trashedIdeas.length > 0 ? ` (${trashedIdeas.length})` : ""}` },
         ]}
         active={tab}
         onChange={setTab}
@@ -215,7 +228,7 @@ export default function AdsPage() {
             <div className="rounded-xl border border-slate-100 p-4">
               <p className="text-xs text-slate-500">Ideas generated</p>
               <p className="mt-1 text-xl font-semibold text-slate-800">
-                {ads.ideasForYou.length}
+                {activeIdeas.length}
               </p>
             </div>
             <div className="rounded-xl border border-slate-100 p-4">
@@ -367,8 +380,8 @@ export default function AdsPage() {
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-slate-500">
-              {ads.ideasForYou.filter((i) => i.status !== "idea").length} of{" "}
-              {ads.ideasForYou.length} actioned. Click a row for the full concept, script draft,
+              {activeIdeas.filter((i) => i.status !== "idea").length} of{" "}
+              {activeIdeas.length} actioned. Click a row for the full concept, script draft,
               and to generate content.
             </p>
             <select
@@ -409,8 +422,8 @@ export default function AdsPage() {
           <DataTable
             data={
               statusFilter === "all"
-                ? ads.ideasForYou
-                : ads.ideasForYou.filter((i) => i.status === statusFilter)
+                ? activeIdeas
+                : activeIdeas.filter((i) => i.status === statusFilter)
             }
             columns={ideaColumns}
             onRowClick={setSelectedIdea}
@@ -490,7 +503,7 @@ export default function AdsPage() {
             metrics. Click a row to refresh or add stats.
           </p>
           {(() => {
-            const published = ads.ideasForYou.filter((i) => i.publishInfo);
+            const published = activeIdeas.filter((i) => i.publishInfo);
             if (published.length === 0) {
               return (
                 <p className="text-sm text-slate-500">
@@ -546,6 +559,45 @@ export default function AdsPage() {
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {tab === "trash" && (
+        <div className="space-y-4">
+          <p className="text-xs text-slate-500">
+            Deleted ideas stay here for 30 days before being removed for good.
+          </p>
+          {trashedIdeas.length === 0 ? (
+            <p className="text-sm text-slate-500">Trash is empty.</p>
+          ) : (
+            <div className="space-y-2">
+              {trashedIdeas.map((idea) => {
+                const deletedAt = new Date(idea.deletedAt!);
+                const daysLeft = daysUntilPurge(idea.deletedAt!);
+                return (
+                  <div
+                    key={idea.id}
+                    className="flex items-center justify-between rounded-lg border border-slate-100 p-3 text-xs"
+                  >
+                    <div>
+                      <p className="font-medium text-slate-700">{idea.title}</p>
+                      <p className="mt-0.5 text-slate-500">
+                        {idea.platform} · {idea.format.replace("_", " ")} · deleted{" "}
+                        {deletedAt.toLocaleDateString()} · {daysLeft} day{daysLeft === 1 ? "" : "s"} left
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => restoreIdea(idea.id)}
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Restore
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

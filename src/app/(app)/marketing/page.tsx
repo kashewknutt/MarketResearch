@@ -8,7 +8,6 @@ import { DataTable } from "@/components/ui/data-table";
 import { CitationList } from "@/components/ui/citation-list";
 import { Tabs } from "@/components/ui/tabs";
 import { CampaignDetailSheet } from "@/components/campaign-detail-sheet";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import { formatMoney } from "@/lib/currency";
 import type {
   MarketingItem,
@@ -73,7 +72,7 @@ export default function MarketingPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">Marketing</h1>
-        <GeminiFallback title="Run research to generate marketing recommendations" verify />
+        <p className="text-sm text-slate-500">Run research to generate marketing recommendations.</p>
       </div>
     );
   }

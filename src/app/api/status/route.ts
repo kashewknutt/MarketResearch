@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getGeminiStatus } from "@/lib/ai/gemini";
 
-export async function GET(request: NextRequest) {
-  const verify = request.nextUrl.searchParams.get("verify") === "true";
-  const gemini = await getGeminiStatus(verify);
+export async function GET() {
+  const gemini = await getGeminiStatus();
 
   return NextResponse.json({
     gemini,

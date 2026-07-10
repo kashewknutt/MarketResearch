@@ -11,6 +11,7 @@ import {
 import { createProvenance } from "@/lib/db/provenance";
 import { ensureFullProjectQueues } from "@/lib/research/project-generator";
 import { runAdTrends } from "@/lib/research/stages/ad-trends";
+import { mergeAdTrendsSnapshot } from "@/lib/research/stages/ad-trends-merge";
 import { runCompetitorIntelligence } from "@/lib/research/stages/competitor-intelligence";
 import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
 import { runEnrichedMarketing } from "@/lib/research/stages/marketing-enriched";
@@ -26,6 +27,7 @@ import {
 import { getProfile } from "@/lib/store/settings";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type {
+  AdTrendsSnapshot,
   CompetitorSnapshot,
   DemandSignal,
   FinancialAssumptions,
@@ -300,9 +302,18 @@ export async function startResearchPipeline(jobId: string): Promise<void> {
     });
 
     await runStage("ad_trends", async () => {
-      const competitors = await getSnapshot<CompetitorSnapshot>("competitors");
-      const ads = await runAdTrends(profile, competitors, jobId);
-      await saveSnapshot("ads", ads);
+      const [competitors, existingAds] = await Promise.all([
+        getSnapshot<CompetitorSnapshot>("competitors"),
+        getSnapshot<AdTrendsSnapshot>("ads"),
+      ]);
+      const ads = await runAdTrends(
+        profile,
+        competitors,
+        jobId,
+        existingAds?.trackedCompetitors,
+        existingAds?.competitorSocialHandles,
+      );
+      await saveSnapshot("ads", mergeAdTrendsSnapshot(existingAds, ads));
     });
 
     await runStage("investment_allocation", async () => {

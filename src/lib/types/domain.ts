@@ -530,6 +530,7 @@ export interface AdIdea {
   linkedInPublish?: LinkedInPublishRecord;
   publishInfo?: AdPublishInfo;
   performanceHistory?: PerformanceSnapshot[];
+  deletedAt?: string;
 }
 
 export interface CompetitorAdActivity {

@@ -1,10 +1,19 @@
 import { NextResponse } from "next/server";
+import { purgeExpiredTrash } from "@/lib/research/stages/ad-trends-merge";
 import { getSnapshot, saveSnapshot } from "@/lib/store/snapshots";
 import type { AdTrendsSnapshot } from "@/lib/types/domain";
 
 export async function GET() {
   const ads = await getSnapshot<AdTrendsSnapshot>("ads");
-  return NextResponse.json({ ads });
+  if (!ads) {
+    return NextResponse.json({ ads });
+  }
+
+  const purged = purgeExpiredTrash(ads);
+  if (purged !== ads) {
+    await saveSnapshot("ads", purged);
+  }
+  return NextResponse.json({ ads: purged });
 }
 
 export async function PATCH(request: Request) {

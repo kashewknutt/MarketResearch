@@ -8,7 +8,6 @@ import {
   FinancialInflowOutflowChart,
   FinancialMrrChart,
 } from "@/components/financial-projection-chart";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import { MetricCard } from "@/components/ui/metric-card";
 import { formatMoney } from "@/lib/currency";
 import { computePlBothScenarios } from "@/lib/research/financial-pl-engine";
@@ -99,7 +98,7 @@ export default function FinancialAnalysisPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">Financial Analysis</h1>
-        <GeminiFallback title="Run research to generate financial analysis" verify />
+        <p className="text-sm text-slate-500">Run research to generate financial analysis.</p>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { requireGeminiReady } from "@/lib/ai/gemini";
 import { createAndStartResearchJob } from "@/lib/research/orchestrator";
 import { runAdTrends } from "@/lib/research/stages/ad-trends";
+import { mergeAdTrendsSnapshot } from "@/lib/research/stages/ad-trends-merge";
 import { runCompetitorIntelligence } from "@/lib/research/stages/competitor-intelligence";
 import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
 import { runEnrichedMarketing } from "@/lib/research/stages/marketing-enriched";
@@ -159,7 +160,7 @@ export async function runSectionRefresh(
         existingAds?.trackedCompetitors,
         existingAds?.competitorSocialHandles,
       );
-      await saveSnapshot("ads", ads);
+      await saveSnapshot("ads", mergeAdTrendsSnapshot(existingAds, ads));
       break;
     }
     default:

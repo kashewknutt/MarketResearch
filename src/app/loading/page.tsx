@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import type { ResearchJob } from "@/lib/types/domain";
 
 const POLL_MS = 3000;
@@ -104,7 +103,6 @@ function LoadingContent() {
               Open Settings
             </Link>
           </div>
-          <GeminiFallback title="Fix Gemini API to continue" verify />
         </div>
       </div>
     );

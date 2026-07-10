@@ -6,7 +6,6 @@ import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import type { LeadRecord } from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -66,7 +65,7 @@ function LeadsPageInner() {
       </header>
 
       {leads.length === 0 && (
-        <GeminiFallback title="Run research or refresh to discover leads" verify />
+        <p className="text-sm text-slate-500">Run research or refresh to discover leads.</p>
       )}
 
       <DataTable

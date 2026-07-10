@@ -151,6 +151,17 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated, contentPresets
 
   const hasContent = Boolean(idea.generatedContent);
 
+  async function deleteIdea() {
+    if (!idea) return;
+    if (!window.confirm("Move this idea to trash? It can be restored within 30 days.")) return;
+    const res = await fetch(`/api/ads/ideas/${idea.id}/trash`, { method: "POST" });
+    const data = await res.json();
+    if (data.ads) {
+      onIdeaUpdated(data.ads);
+      onClose();
+    }
+  }
+
   async function generateContent() {
     if (!idea) return;
     setGenerating(true);
@@ -383,6 +394,13 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated, contentPresets
             entityId={idea.id}
             defaultTitle={idea.title}
           />
+          <button
+            type="button"
+            onClick={deleteIdea}
+            className="rounded-md px-2 py-1 text-sm text-rose-600 hover:bg-rose-50"
+          >
+            Delete
+          </button>
           <button
             type="button"
             onClick={onClose}

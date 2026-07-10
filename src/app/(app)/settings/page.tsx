@@ -2,7 +2,6 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import { RevenueGoalFields } from "@/components/revenue-goal-fields";
 import { SocialLinksFields } from "@/components/social-links-fields";
 import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
@@ -23,7 +22,7 @@ function SettingsContent() {
     fetch("/api/profile")
       .then((r) => r.json())
       .then((d) => setProfile(d.profile));
-    fetch("/api/status?verify=true")
+    fetch("/api/status")
       .then((r) => r.json())
       .then((d) => {
         setGeminiStatus(d.gemini?.status ?? null);
@@ -78,8 +77,6 @@ function SettingsContent() {
           </p>
         )}
       </header>
-
-      <GeminiFallback title="Gemini API required for research" verify />
 
       <section className="rounded-xl border border-slate-100 p-5">
         <h2 className="text-sm font-semibold text-slate-700">API status</h2>

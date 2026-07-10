@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AppTopBar } from "@/components/app-top-bar";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import { Sidebar } from "@/components/sidebar";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
 import type { MarketProject } from "@/lib/types/domain";
@@ -40,9 +39,6 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <AppTopBar />
         <main className="flex-1 overflow-y-auto p-8">
-          <div className="mb-6">
-            <GeminiFallback compact verify />
-          </div>
           {children}
         </main>
       </div>

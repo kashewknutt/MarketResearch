@@ -276,9 +276,20 @@ export async function verifyGoogleSearchGrounding(): Promise<GoogleSearchVerifyR
   }
 }
 
-export async function getGeminiStatus(
-  verify = false,
-): Promise<GeminiStatusPayload> {
+/**
+ * Populated once by src/instrumentation.ts's register() hook when the
+ * server process starts. Nothing else re-verifies Gemini connectivity —
+ * per-page/per-request live checks were removed since they cost a real API
+ * call every time and the connection doesn't change during a server's
+ * lifetime.
+ */
+let startupStatus: GeminiStatusPayload | null = null;
+
+export function setStartupGeminiStatus(status: GeminiStatusPayload): void {
+  startupStatus = status;
+}
+
+export async function getGeminiStatus(): Promise<GeminiStatusPayload> {
   if (!hasGeminiKey()) {
     return {
       status: "missing_key",
@@ -287,21 +298,13 @@ export async function getGeminiStatus(
     };
   }
 
-  if (!verify) {
-    return {
-      status: "ready",
-      message: "API key configured. Run research to verify connectivity.",
-      model: MODEL,
-    };
+  if (startupStatus) {
+    return startupStatus;
   }
 
-  const result = await verifyGeminiConnection();
-  if (result.status !== "ready") {
-    return result;
-  }
   return {
     status: "ready",
-    message: "Gemini API is connected and ready.",
+    message: "API key configured. Verification runs once at server startup.",
     model: MODEL,
   };
 }

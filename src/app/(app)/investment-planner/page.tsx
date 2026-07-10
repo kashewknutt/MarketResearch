@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
 import { EditableField } from "@/components/editable-field";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import { currencyInputPrefix, formatMoney } from "@/lib/currency";
 import type { InvestmentSnapshot, OnboardingProfile } from "@/lib/types/domain";
 
@@ -58,7 +57,7 @@ export default function InvestmentPlannerPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">Investment Planner</h1>
-        <GeminiFallback title="Run research to generate investment plan" verify />
+        <p className="text-sm text-slate-500">Run research to generate investment plan.</p>
       </div>
     );
   }

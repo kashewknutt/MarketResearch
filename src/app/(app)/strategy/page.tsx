@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
-import { GeminiFallback } from "@/components/gemini-fallback";
 import { EditableField } from "@/components/editable-field";
 import { ProjectCard } from "@/components/project-card";
 import type { MarketProject, StrategySnapshot } from "@/lib/types/domain";
@@ -42,7 +41,7 @@ export default function StrategyPage() {
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold text-slate-800">Strategy</h1>
-        <GeminiFallback title="Run research to generate strategy insights" verify />
+        <p className="text-sm text-slate-500">Run research to generate strategy insights.</p>
       </div>
     );
   }
