@@ -8,7 +8,7 @@ import type { Citation, MarketProject, OnboardingProfile } from "@/lib/types/dom
 import { getProjectsByRegion, saveProject } from "@/lib/store/projects";
 import { getDb } from "@/lib/db/client";
 import { projects as projectsTable } from "@/lib/db/schema";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentOrg } from "@/lib/auth/session";
 import { and, eq } from "drizzle-orm";
 
 function mergeCitations(...groups: Citation[][]): Citation[] {
@@ -129,14 +129,14 @@ Return JSON:
                 hasUrl ? 0.85 : 0.55,
               ),
             };
-            const userId = await getCurrentUserId();
+            const { orgId } = await getCurrentOrg();
             const db = getDb();
             const row = await db
               .select()
               .from(projectsTable)
               .where(
                 and(
-                  eq(projectsTable.userId, userId),
+                  eq(projectsTable.orgId, orgId),
                   eq(projectsTable.id, enriched.id),
                 ),
               )

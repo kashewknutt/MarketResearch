@@ -1,19 +1,19 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { demandSignals } from "@/lib/db/schema";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentOrg } from "@/lib/auth/session";
 import type { DemandSignal, RegionCode } from "@/lib/types/domain";
 
 export async function getDemandsByRegion(
   region: RegionCode,
 ): Promise<DemandSignal[]> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const rows = await db
     .select()
     .from(demandSignals)
     .where(
-      and(eq(demandSignals.userId, userId), eq(demandSignals.region, region)),
+      and(eq(demandSignals.orgId, orgId), eq(demandSignals.region, region)),
     );
   return rows
     .map((r) => JSON.parse(r.data) as DemandSignal)
@@ -21,7 +21,7 @@ export async function getDemandsByRegion(
 }
 
 export async function saveDemands(signals: DemandSignal[]): Promise<void> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   for (const signal of signals) {
     const data = JSON.stringify(signal);
@@ -29,13 +29,13 @@ export async function saveDemands(signals: DemandSignal[]): Promise<void> {
       .select()
       .from(demandSignals)
       .where(
-        and(eq(demandSignals.userId, userId), eq(demandSignals.id, signal.id)),
+        and(eq(demandSignals.orgId, orgId), eq(demandSignals.id, signal.id)),
       )
       .limit(1);
     if (existing.length === 0) {
       await db.insert(demandSignals).values({
         id: signal.id,
-        userId,
+        orgId,
         region: signal.region,
         rank: signal.rank,
         data,
@@ -46,7 +46,7 @@ export async function saveDemands(signals: DemandSignal[]): Promise<void> {
         .set({ data, rank: signal.rank })
         .where(
           and(
-            eq(demandSignals.userId, userId),
+            eq(demandSignals.orgId, orgId),
             eq(demandSignals.id, signal.id),
           ),
         );
@@ -55,7 +55,7 @@ export async function saveDemands(signals: DemandSignal[]): Promise<void> {
 }
 
 export async function clearDemands(): Promise<void> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
-  await db.delete(demandSignals).where(eq(demandSignals.userId, userId));
+  await db.delete(demandSignals).where(eq(demandSignals.orgId, orgId));
 }

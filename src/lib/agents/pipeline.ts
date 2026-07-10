@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db/client";
 import { researchArtifacts } from "@/lib/db/schema";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentOrg } from "@/lib/auth/session";
 
 export interface PipelineStep<TCtx> {
   id: string;
@@ -27,11 +27,11 @@ export async function runPipeline<TCtx>(
     options.onStepComplete?.(step.id, ctx);
 
     if (options.jobId && options.stageId) {
-      const userId = await getCurrentUserId();
+      const { orgId } = await getCurrentOrg();
       const db = getDb();
       await db.insert(researchArtifacts).values({
         id: randomUUID(),
-        userId,
+        orgId,
         jobId: options.jobId,
         stageId: options.stageId,
         stepId: step.id,

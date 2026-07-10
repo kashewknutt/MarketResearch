@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
@@ -12,6 +13,16 @@ import type { ColumnDef } from "@tanstack/react-table";
 const col = createColumnHelper<MarketProject>();
 
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProjectsPageInner />
+    </Suspense>
+  );
+}
+
+function ProjectsPageInner() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [projects, setProjects] = useState<MarketProject[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [filter, setFilter] = useState<string>("all");
@@ -31,6 +42,12 @@ export default function ProjectsPage() {
   }, [load]);
 
   useAppRefresh(load, ["projects", "all"]);
+
+  useEffect(() => {
+    if (!focusId || projects.length === 0) return;
+    const match = projects.find((p) => p.id === focusId);
+    if (match) setSelected(match);
+  }, [focusId, projects]);
 
   const filtered =
     filter === "all" ? projects : projects.filter((p) => p.region === filter);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
@@ -12,6 +13,16 @@ import type { ColumnDef } from "@tanstack/react-table";
 const col = createColumnHelper<LeadRecord>();
 
 export default function LeadsPage() {
+  return (
+    <Suspense fallback={null}>
+      <LeadsPageInner />
+    </Suspense>
+  );
+}
+
+function LeadsPageInner() {
+  const searchParams = useSearchParams();
+  const focusId = searchParams.get("focus");
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [selected, setSelected] = useState<LeadRecord | null>(null);
   const load = useCallback(() => {
@@ -25,6 +36,12 @@ export default function LeadsPage() {
   }, [load]);
 
   useAppRefresh(load, ["leads", "all"]);
+
+  useEffect(() => {
+    if (!focusId || leads.length === 0) return;
+    const match = leads.find((l) => l.id === focusId);
+    if (match) setSelected(match);
+  }, [focusId, leads]);
 
   const columns = [
     col.accessor("company", { header: "Company" }),

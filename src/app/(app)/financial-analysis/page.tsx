@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
+import { AssignTaskButton } from "@/components/assign-task-button";
 import { FinancialMetricGrid } from "@/components/financial-metric-grid";
 import {
   FinancialInflowOutflowChart,
@@ -119,13 +120,21 @@ export default function FinancialAnalysisPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Financial Analysis</h1>
-        <p className="mt-1 text-sm text-slate-500">{financial.narrative}</p>
-        <p className="mt-2 text-xs text-slate-500">
-          Domain-specific P&L: edit revenue and expense metrics per month (Conservative vs
-          Ambitious). Total Revenue, EBITDA, Net Profit, and margin are computed automatically.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Financial Analysis</h1>
+          <p className="mt-1 text-sm text-slate-500">{financial.narrative}</p>
+          <p className="mt-2 text-xs text-slate-500">
+            Domain-specific P&L: edit revenue and expense metrics per month (Conservative vs
+            Ambitious). Total Revenue, EBITDA, Net Profit, and margin are computed automatically.
+          </p>
+        </div>
+        <AssignTaskButton
+          entityType="financial"
+          entityId="financial"
+          defaultTitle="Follow up on financial analysis"
+          className="shrink-0"
+        />
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

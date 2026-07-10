@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
+import { AssignTaskButton } from "@/components/assign-task-button";
 import { DataTable } from "@/components/ui/data-table";
 import { CitationList } from "@/components/ui/citation-list";
 import { Tabs } from "@/components/ui/tabs";
@@ -86,9 +87,17 @@ export default function MarketingPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Marketing</h1>
-        <p className="mt-1 text-xs text-slate-500">Amounts in {currency} where applicable</p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Marketing</h1>
+          <p className="mt-1 text-xs text-slate-500">Amounts in {currency} where applicable</p>
+        </div>
+        <AssignTaskButton
+          entityType="marketing"
+          entityId="marketing"
+          defaultTitle="Follow up on marketing"
+          className="shrink-0"
+        />
       </header>
 
       <Tabs

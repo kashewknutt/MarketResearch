@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
+import { AssignTaskButton } from "@/components/assign-task-button";
 import { EditableField } from "@/components/editable-field";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { currencyInputPrefix, formatMoney } from "@/lib/currency";
@@ -66,14 +67,22 @@ export default function InvestmentPlannerPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Investment Planner</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Where to put money, why it matters, and expected outcomes.
-        </p>
-        <p className="mt-4 text-2xl font-semibold text-violet-700">
-          {money(investment.totalRecommended)} recommended
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Investment Planner</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Where to put money, why it matters, and expected outcomes.
+          </p>
+          <p className="mt-4 text-2xl font-semibold text-violet-700">
+            {money(investment.totalRecommended)} recommended
+          </p>
+        </div>
+        <AssignTaskButton
+          entityType="investment"
+          entityId="investment"
+          defaultTitle="Follow up on investment plan"
+          className="shrink-0"
+        />
       </header>
 
       <div className="space-y-4">

@@ -11,8 +11,11 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
+    "db:push": "tsx scripts/db-push-safe.ts",
+    "db:push:raw": "drizzle-kit push",
     "backfill:supabase": "tsx scripts/backfill-supabase.ts",
+    "org:rename-columns": "tsx scripts/rename-user-id-to-org-id.ts",
+    "org:seed-valnee": "tsx scripts/seed-valnee-org.ts",
     "test:projection": "tsx src/lib/research/__tests__/projection-engine.test.ts",
     "postinstall": "npm rebuild better-sqlite3 || true"
   },

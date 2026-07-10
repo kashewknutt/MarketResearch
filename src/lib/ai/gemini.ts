@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { getDb } from "@/lib/db/client";
 import { aiLogs } from "@/lib/db/schema";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentOrg } from "@/lib/auth/session";
 import type { Citation } from "@/lib/types/domain";
 import {
   classifyGeminiError,
@@ -353,10 +353,10 @@ async function logAiCall(
   response: string,
   costEventId: string,
 ): Promise<void> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   await db.insert(aiLogs).values({
-    userId,
+    orgId,
     task,
     prompt: prompt.slice(0, 8000),
     response: response.slice(0, 16000),

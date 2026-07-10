@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { getDb } from "@/lib/db/client";
 import { apiCostEvents, pricingSnapshots } from "@/lib/db/schema";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentOrg } from "@/lib/auth/session";
 import { and, desc, eq, sql } from "drizzle-orm";
 import type {
   AiCallTrace,
@@ -141,11 +141,11 @@ async function savePricingSnapshot(
   pricing: ModelPricingRates,
 ): Promise<string> {
   const id = randomUUID();
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   await db.insert(pricingSnapshots).values({
     id,
-    userId,
+    orgId,
     model: pricing.modelId,
     data: JSON.stringify(pricing),
     fetchedAt: pricing.fetchedAt,
@@ -192,11 +192,11 @@ export async function recordApiCostEvent(
   const createdAt = new Date().toISOString();
   const metadata = input.trace.metadata ?? {};
 
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   await db.insert(apiCostEvents).values({
     id,
-    userId,
+    orgId,
     createdAt,
     operation: input.trace.operation,
     category: input.trace.category,
@@ -257,12 +257,12 @@ export async function recordApiCostEvent(
 }
 
 export async function listCostEvents(limit = 100): Promise<ApiCostEventRecord[]> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const rows = await db
     .select()
     .from(apiCostEvents)
-    .where(eq(apiCostEvents.userId, userId))
+    .where(eq(apiCostEvents.orgId, orgId))
     .orderBy(desc(apiCostEvents.createdAt))
     .limit(limit);
 
@@ -298,7 +298,7 @@ export async function listCostEvents(limit = 100): Promise<ApiCostEventRecord[]>
 }
 
 export async function getCostSummary() {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const totals = await db
     .select({
@@ -312,7 +312,7 @@ export async function getCostSummary() {
       searchQueries: sql<number>`coalesce(sum(${apiCostEvents.searchQueryCount}), 0)`,
     })
     .from(apiCostEvents)
-    .where(eq(apiCostEvents.userId, userId));
+    .where(eq(apiCostEvents.orgId, orgId));
 
   const byCategory = await db
     .select({
@@ -321,7 +321,7 @@ export async function getCostSummary() {
       count: sql<number>`count(*)`,
     })
     .from(apiCostEvents)
-    .where(eq(apiCostEvents.userId, userId))
+    .where(eq(apiCostEvents.orgId, orgId))
     .groupBy(apiCostEvents.category);
 
   const pricing = await fetchLivePricing(GEMINI_MODEL);
@@ -349,12 +349,12 @@ export async function getCostSummary() {
 export async function getPricingSnapshot(
   id: string,
 ): Promise<ModelPricingRates | null> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const rows = await db
     .select()
     .from(pricingSnapshots)
-    .where(and(eq(pricingSnapshots.userId, userId), eq(pricingSnapshots.id, id)))
+    .where(and(eq(pricingSnapshots.orgId, orgId), eq(pricingSnapshots.id, id)))
     .limit(1);
   if (rows.length === 0) return null;
   return JSON.parse(rows[0].data) as ModelPricingRates;

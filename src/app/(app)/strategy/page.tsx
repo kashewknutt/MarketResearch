@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
+import { AssignTaskButton } from "@/components/assign-task-button";
 import { GeminiFallback } from "@/components/gemini-fallback";
 import { EditableField } from "@/components/editable-field";
 import { ProjectCard } from "@/components/project-card";
@@ -48,11 +49,19 @@ export default function StrategyPage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Strategy</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Understand targets, requirements, and where to focus.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Strategy</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Understand targets, requirements, and where to focus.
+          </p>
+        </div>
+        <AssignTaskButton
+          entityType="strategy"
+          entityId="strategy"
+          defaultTitle="Follow up on strategy"
+          className="shrink-0"
+        />
       </header>
 
       <EditableField

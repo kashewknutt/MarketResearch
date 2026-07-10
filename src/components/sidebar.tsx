@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 
 const NAV = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/tasks", label: "Tasks" },
   { href: "/projects", label: "Projects" },
   { href: "/leads", label: "Leads" },
   { href: "/financial-analysis", label: "Financial Analysis" },
@@ -15,6 +16,7 @@ const NAV = [
   { href: "/investment-planner", label: "Investment Planner" },
   { href: "/research-sources", label: "Research Sources" },
   { href: "/api-costs", label: "API Costs" },
+  { href: "/team", label: "Team" },
   { href: "/settings", label: "Settings" },
 ];
 

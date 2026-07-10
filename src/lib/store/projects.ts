@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { projects as projectsTable } from "@/lib/db/schema";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentOrg } from "@/lib/auth/session";
 import type { MarketProject, RegionCode } from "@/lib/types/domain";
 import { PROJECTS_PER_REGION } from "@/lib/types/domain";
 
@@ -9,7 +9,7 @@ export async function getProjectsByRegion(
   region: RegionCode,
   status?: "active" | "done",
 ): Promise<MarketProject[]> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const rows = await db
     .select()
@@ -17,12 +17,12 @@ export async function getProjectsByRegion(
     .where(
       status
         ? and(
-            eq(projectsTable.userId, userId),
+            eq(projectsTable.orgId, orgId),
             eq(projectsTable.region, region),
             eq(projectsTable.status, status),
           )
         : and(
-            eq(projectsTable.userId, userId),
+            eq(projectsTable.orgId, orgId),
             eq(projectsTable.region, region),
           ),
     );
@@ -32,13 +32,13 @@ export async function getProjectsByRegion(
 }
 
 export async function getAllActiveProjects(): Promise<MarketProject[]> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const rows = await db
     .select()
     .from(projectsTable)
     .where(
-      and(eq(projectsTable.userId, userId), eq(projectsTable.status, "active")),
+      and(eq(projectsTable.orgId, orgId), eq(projectsTable.status, "active")),
     );
   return rows.map((r) => JSON.parse(r.data) as MarketProject);
 }
@@ -46,12 +46,12 @@ export async function getAllActiveProjects(): Promise<MarketProject[]> {
 export async function getProjectById(
   id: string,
 ): Promise<MarketProject | null> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const rows = await db
     .select()
     .from(projectsTable)
-    .where(and(eq(projectsTable.userId, userId), eq(projectsTable.id, id)))
+    .where(and(eq(projectsTable.orgId, orgId), eq(projectsTable.id, id)))
     .limit(1);
   if (rows.length === 0) return null;
   return JSON.parse(rows[0].data) as MarketProject;
@@ -61,20 +61,20 @@ export async function saveProject(
   project: MarketProject,
   sortOrder: number,
 ): Promise<void> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   const data = JSON.stringify(project);
   const existing = await db
     .select()
     .from(projectsTable)
     .where(
-      and(eq(projectsTable.userId, userId), eq(projectsTable.id, project.id)),
+      and(eq(projectsTable.orgId, orgId), eq(projectsTable.id, project.id)),
     )
     .limit(1);
   if (existing.length === 0) {
     await db.insert(projectsTable).values({
       id: project.id,
-      userId,
+      orgId,
       region: project.region,
       status: project.status,
       data,
@@ -85,7 +85,7 @@ export async function saveProject(
       .update(projectsTable)
       .set({ data, status: project.status, sortOrder })
       .where(
-        and(eq(projectsTable.userId, userId), eq(projectsTable.id, project.id)),
+        and(eq(projectsTable.orgId, orgId), eq(projectsTable.id, project.id)),
       );
   }
 }
@@ -96,12 +96,12 @@ export async function countActiveByRegion(region: RegionCode): Promise<number> {
 }
 
 export async function clearProjectsForRegion(region: RegionCode): Promise<void> {
-  const userId = await getCurrentUserId();
+  const { orgId } = await getCurrentOrg();
   const db = getDb();
   await db
     .delete(projectsTable)
     .where(
-      and(eq(projectsTable.userId, userId), eq(projectsTable.region, region)),
+      and(eq(projectsTable.orgId, orgId), eq(projectsTable.region, region)),
     );
 }
 

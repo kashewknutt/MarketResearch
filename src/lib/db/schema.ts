@@ -9,15 +9,49 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 
+export const orgs = pgTable("orgs", {
+  id: uuid("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  ownerId: uuid("owner_id").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const orgMembers = pgTable(
+  "org_members",
+  {
+    orgId: uuid("org_id").notNull(),
+    userId: uuid("user_id").notNull(),
+    role: text("role").notNull(),
+    invitedBy: uuid("invited_by"),
+    joinedAt: text("joined_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.orgId, table.userId] })],
+);
+
+export const assignments = pgTable("assignments", {
+  id: text("id").primaryKey(),
+  orgId: uuid("org_id").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id"),
+  assigneeUserId: uuid("assignee_user_id").notNull(),
+  assignedByUserId: uuid("assigned_by_user_id").notNull(),
+  title: text("title").notNull(),
+  notes: text("notes"),
+  status: text("status").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const appProfile = pgTable("app_profile", {
-  userId: uuid("user_id").primaryKey(),
+  orgId: uuid("org_id").primaryKey(),
   data: text("data").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
 
 export const researchJobs = pgTable("research_jobs", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   status: text("status").notNull(),
   stages: text("stages").notNull(),
   startedAt: text("started_at").notNull(),
@@ -26,7 +60,7 @@ export const researchJobs = pgTable("research_jobs", {
 
 export const demandSignals = pgTable("demand_signals", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   region: text("region").notNull(),
   rank: integer("rank").notNull(),
   data: text("data").notNull(),
@@ -34,7 +68,7 @@ export const demandSignals = pgTable("demand_signals", {
 
 export const projects = pgTable("projects", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   region: text("region").notNull(),
   status: text("status").notNull(),
   data: text("data").notNull(),
@@ -44,17 +78,17 @@ export const projects = pgTable("projects", {
 export const snapshots = pgTable(
   "snapshots",
   {
-    userId: uuid("user_id").notNull(),
+    orgId: uuid("org_id").notNull(),
     key: text("key").notNull(),
     data: text("data").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
-  (table) => [primaryKey({ columns: [table.userId, table.key] })],
+  (table) => [primaryKey({ columns: [table.orgId, table.key] })],
 );
 
 export const aiLogs = pgTable("ai_logs", {
   id: serial("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   task: text("task").notNull(),
   prompt: text("prompt").notNull(),
   response: text("response"),
@@ -64,7 +98,7 @@ export const aiLogs = pgTable("ai_logs", {
 
 export const pricingSnapshots = pgTable("pricing_snapshots", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   model: text("model").notNull(),
   data: text("data").notNull(),
   fetchedAt: text("fetched_at").notNull(),
@@ -72,7 +106,7 @@ export const pricingSnapshots = pgTable("pricing_snapshots", {
 
 export const leads = pgTable("leads", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   region: text("region").notNull(),
   status: text("status").notNull(),
   data: text("data").notNull(),
@@ -81,7 +115,7 @@ export const leads = pgTable("leads", {
 
 export const researchArtifacts = pgTable("research_artifacts", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   jobId: text("job_id").notNull(),
   stageId: text("stage_id").notNull(),
   stepId: text("step_id").notNull(),
@@ -91,7 +125,7 @@ export const researchArtifacts = pgTable("research_artifacts", {
 
 export const apiCostEvents = pgTable("api_cost_events", {
   id: text("id").primaryKey(),
-  userId: uuid("user_id").notNull(),
+  orgId: uuid("org_id").notNull(),
   createdAt: text("created_at").notNull(),
   operation: text("operation").notNull(),
   category: text("category").notNull(),

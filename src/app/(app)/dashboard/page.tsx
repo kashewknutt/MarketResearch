@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
+import { AssignTaskButton } from "@/components/assign-task-button";
 import {
   Bar,
   BarChart,
@@ -83,11 +84,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-10">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {profile.serviceDomain} · all figures in {metrics.currency}
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Dashboard</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            {profile.serviceDomain} · all figures in {metrics.currency}
+          </p>
+        </div>
+        <AssignTaskButton
+          entityType="freeform"
+          entityId={null}
+          defaultTitle=""
+          className="shrink-0"
+        />
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

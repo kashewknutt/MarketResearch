@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentOrg } from "@/lib/auth/session";
 import { isOnboardingComplete } from "@/lib/store/settings";
 import { isSetupComplete } from "@/lib/store/setup";
 
@@ -220,6 +221,19 @@ function LandingPage() {
   );
 }
 
+function NoOrgAccess() {
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-sky-50/40 via-white to-violet-50/30 px-6 text-center">
+      <p className="text-sm text-slate-600">
+        You&apos;re signed in, but you haven&apos;t been added to an organization yet.
+      </p>
+      <p className="mt-2 text-xs text-slate-400">
+        Ask your organization&apos;s owner to add your email from the Team page.
+      </p>
+    </div>
+  );
+}
+
 export default async function Home() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
@@ -227,6 +241,17 @@ export default async function Home() {
 
   if (!isAuthenticated) {
     return <LandingPage />;
+  }
+
+  let role: "owner" | "member";
+  try {
+    ({ role } = await getCurrentOrg());
+  } catch {
+    return <NoOrgAccess />;
+  }
+
+  if (role === "member") {
+    redirect("/tasks");
   }
 
   if (await isOnboardingComplete()) {
