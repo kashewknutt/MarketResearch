@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentOrg } from "@/lib/auth/session";
+import { getCurrentOrg, NoOrgMembershipError } from "@/lib/auth/session";
 import { isOnboardingComplete } from "@/lib/store/settings";
 import { isSetupComplete } from "@/lib/store/setup";
 
@@ -246,8 +246,11 @@ export default async function Home() {
   let role: "owner" | "member";
   try {
     ({ role } = await getCurrentOrg());
-  } catch {
-    return <NoOrgAccess />;
+  } catch (err) {
+    if (err instanceof NoOrgMembershipError) {
+      return <NoOrgAccess />;
+    }
+    throw err;
   }
 
   if (role === "member") {
