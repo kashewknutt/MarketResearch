@@ -415,12 +415,6 @@ export default function AdsPage() {
             columns={ideaColumns}
             onRowClick={setSelectedIdea}
           />
-          <AdIdeaDetailSheet
-            idea={selectedIdea}
-            onClose={() => setSelectedIdea(null)}
-            onIdeaUpdated={handleIdeaUpdated}
-            contentPresets={contentPresets}
-          />
         </div>
       )}
 
@@ -435,7 +429,6 @@ export default function AdsPage() {
             columns={exampleColumns}
             onRowClick={setSelectedExample}
           />
-          <TrendingAdDetailSheet example={selectedExample} onClose={() => setSelectedExample(null)} />
         </div>
       )}
 
@@ -487,7 +480,6 @@ export default function AdsPage() {
               </div>
             ))
           )}
-          <TrendingAdDetailSheet example={selectedExample} onClose={() => setSelectedExample(null)} />
         </div>
       )}
 
@@ -554,14 +546,25 @@ export default function AdsPage() {
               </div>
             );
           })()}
-          <AdIdeaDetailSheet
-            idea={selectedIdea}
-            onClose={() => setSelectedIdea(null)}
-            onIdeaUpdated={handleIdeaUpdated}
-            contentPresets={contentPresets}
-          />
         </div>
       )}
+
+      <AdIdeaDetailSheet
+        idea={selectedIdea}
+        onClose={() => setSelectedIdea(null)}
+        onIdeaUpdated={handleIdeaUpdated}
+        contentPresets={contentPresets}
+      />
+      <TrendingAdDetailSheet
+        example={selectedExample}
+        onClose={() => setSelectedExample(null)}
+        contentPresets={contentPresets}
+        onContentGenerated={(updated, idea) => {
+          setAds(updated);
+          setSelectedExample(null);
+          setSelectedIdea(idea);
+        }}
+      />
     </div>
   );
 }

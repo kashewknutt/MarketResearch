@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { useEffect, useState } from "react";
+import { AssignTaskButton } from "@/components/assign-task-button";
 import { CitationList } from "@/components/ui/citation-list";
 import { formatMoney } from "@/lib/currency";
 import type { MarketingItem } from "@/lib/types/domain";
@@ -55,13 +56,20 @@ export function CampaignDetailSheet({
     <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">{campaign.title}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-50"
-        >
-          Close
-        </button>
+        <div className="flex items-center gap-2">
+          <AssignTaskButton
+            entityType="marketing"
+            entityId={campaign.id}
+            defaultTitle={campaign.title}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
         <span className="inline-block rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">

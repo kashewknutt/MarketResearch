@@ -900,22 +900,90 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated, contentPresets
 interface TrendingAdDetailSheetProps {
   example: TrendingAdExample | null;
   onClose: () => void;
+  contentPresets: ContentConstraintPreset[];
+  onContentGenerated: (ads: AdTrendsSnapshot, idea: AdIdea) => void;
 }
 
-export function TrendingAdDetailSheet({ example, onClose }: TrendingAdDetailSheetProps) {
+export function TrendingAdDetailSheet({
+  example,
+  onClose,
+  contentPresets,
+  onContentGenerated,
+}: TrendingAdDetailSheetProps) {
+  const [constraintsNotes, setConstraintsNotes] = useState("");
+  const [timeOfDay, setTimeOfDay] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setConstraintsNotes("");
+    setTimeOfDay("");
+    setSelectedPresetId("");
+    setGenerateError(null);
+  }, [example?.id]);
+
   if (!example) return null;
+
+  function applyPreset(presetId: string) {
+    setSelectedPresetId(presetId);
+    const preset = contentPresets.find((p) => p.id === presetId);
+    if (preset) setConstraintsNotes(preset.notes);
+  }
+
+  async function generateFromTrend() {
+    if (!example) return;
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const createRes = await fetch("/api/ads/ideas/from-trending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exampleId: example.id }),
+      });
+      const createData = await createRes.json();
+      if (!createRes.ok) {
+        setGenerateError(createData.message ?? createData.error ?? "Could not create an idea from this trend");
+        return;
+      }
+
+      const contentRes = await fetch(`/api/ads/ideas/${createData.idea.id}/content`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: constraintsNotes, timeOfDay: timeOfDay || undefined }),
+      });
+      const contentData = await contentRes.json();
+      if (!contentRes.ok) {
+        setGenerateError(contentData.message ?? contentData.error ?? "Content generation failed");
+        return;
+      }
+
+      onContentGenerated(contentData.ads, contentData.idea);
+    } catch {
+      setGenerateError("Content generation failed — check your connection and try again.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">{example.title}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-50"
-        >
-          Close
-        </button>
+        <div className="flex items-center gap-2">
+          <AssignTaskButton
+            entityType="freeform"
+            entityId={null}
+            defaultTitle={`Look into trending ad: ${example.title}`}
+          />
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-2 py-1 text-sm text-slate-500 hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -970,6 +1038,63 @@ export function TrendingAdDetailSheet({ example, onClose }: TrendingAdDetailShee
         <section>
           <p className="text-sm font-medium text-slate-800">Citations</p>
           <CitationList citations={example.citations} />
+        </section>
+
+        <section className="rounded-lg border border-slate-100 p-4">
+          <p className="text-sm font-medium text-slate-800">Generate content from this trend</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Turns this into one of your own ideas and generates a script/caption for it. Set your
+            premise/constraints below first.
+          </p>
+
+          {contentPresets.length > 0 && (
+            <select
+              value={selectedPresetId}
+              onChange={(e) => applyPreset(e.target.value)}
+              className="mt-2 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+            >
+              <option value="">Custom (write below)</option>
+              {contentPresets.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <textarea
+            value={constraintsNotes}
+            onChange={(e) => setConstraintsNotes(e.target.value)}
+            placeholder="e.g. I only have a bedroom, no other locations, small budget, no actors besides me"
+            rows={3}
+            className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
+          />
+
+          <div className="mt-2">
+            <label className="text-xs text-slate-500">Time of day (sets natural light)</label>
+            <select
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+            >
+              <option value="">Not specified</option>
+              {TIME_OF_DAY_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={generateFromTrend}
+            disabled={generating}
+            className="mt-2 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-800 disabled:opacity-50"
+          >
+            {generating ? "Generating…" : "Generate content"}
+          </button>
+          {generateError && <p className="mt-2 text-xs text-rose-700">{generateError}</p>}
         </section>
       </div>
     </div>
