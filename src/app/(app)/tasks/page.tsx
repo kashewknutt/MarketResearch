@@ -3,9 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
-import { AdIdeaDetailSheet } from "@/components/ad-idea-detail-sheet";
-import type { AdTrendsSnapshot } from "@/lib/types/domain";
-import type { Assignment, AssignmentStatus } from "@/lib/store/assignments";
+import { AdIdeaDetailSheet, TrendingAdDetailSheet } from "@/components/ad-idea-detail-sheet";
+import { ProjectDetailSheet } from "@/components/project-detail-sheet";
+import { LeadDetailSheet } from "@/components/lead-detail-sheet";
+import { CampaignDetailSheet } from "@/components/campaign-detail-sheet";
+import type {
+  AdTrendsSnapshot,
+  LeadRecord,
+  MarketingItem,
+  MarketingSnapshot,
+  MarketProject,
+  TrendingAdExample,
+} from "@/lib/types/domain";
+import type { Assignment, AssignmentEntityType, AssignmentStatus } from "@/lib/store/assignments";
 
 const STATUS_LABELS: Record<AssignmentStatus, string> = {
   assigned: "Assigned",
@@ -13,8 +23,9 @@ const STATUS_LABELS: Record<AssignmentStatus, string> = {
   done: "Done",
 };
 
-const ENTITY_LABELS: Record<Assignment["entityType"], string> = {
+const ENTITY_LABELS: Record<AssignmentEntityType, string> = {
   ad_idea: "Ad idea",
+  trending_ad: "Trending ad",
   project: "Project",
   lead: "Lead",
   financial: "Financial",
@@ -24,17 +35,48 @@ const ENTITY_LABELS: Record<Assignment["entityType"], string> = {
   freeform: "Task",
 };
 
-const PAGE_LINKS: Partial<Record<Assignment["entityType"], string>> = {
+const PAGE_LINKS: Partial<Record<AssignmentEntityType, string>> = {
   financial: "/financial-analysis",
   marketing: "/marketing",
   strategy: "/strategy",
   investment: "/investment-planner",
 };
 
+function findMarketingItem(marketing: MarketingSnapshot | null, id: string): MarketingItem | null {
+  if (!marketing) return null;
+  const all = [
+    ...marketing.contentThemes,
+    ...marketing.offers,
+    ...marketing.channels,
+    ...marketing.proofAssets,
+  ];
+  return all.find((item) => item.id === id) ?? null;
+}
+
+function findTrendingExample(ads: AdTrendsSnapshot | null, id: string): TrendingAdExample | null {
+  if (!ads) return null;
+  const fromTrending = ads.trendingNow.find((e) => e.id === id);
+  if (fromTrending) return fromTrending;
+  for (const c of ads.competitorActivity) {
+    const match = c.examples.find((e) => e.id === id);
+    if (match) return match;
+  }
+  return null;
+}
+
 export default function TasksPage() {
   const [items, setItems] = useState<Assignment[]>([]);
   const [ads, setAds] = useState<AdTrendsSnapshot | null>(null);
+  const [projects, setProjects] = useState<MarketProject[]>([]);
+  const [leads, setLeads] = useState<LeadRecord[]>([]);
+  const [marketing, setMarketing] = useState<MarketingSnapshot | null>(null);
+  const [currency, setCurrency] = useState("USD");
+
   const [openAdIdeaId, setOpenAdIdeaId] = useState<string | null>(null);
+  const [openTrendingId, setOpenTrendingId] = useState<string | null>(null);
+  const [openProjectId, setOpenProjectId] = useState<string | null>(null);
+  const [openLeadId, setOpenLeadId] = useState<string | null>(null);
+  const [openMarketingId, setOpenMarketingId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     fetch("/api/assignments")
@@ -69,7 +111,115 @@ export default function TasksPage() {
     setOpenAdIdeaId(entityId);
   };
 
+  const openTrendingAd = async (entityId: string) => {
+    if (!ads) {
+      const res = await fetch("/api/ads");
+      const data = await res.json();
+      setAds(data.ads ?? null);
+    }
+    setOpenTrendingId(entityId);
+  };
+
+  const openProject = async (entityId: string) => {
+    if (projects.length === 0) {
+      const res = await fetch("/api/projects");
+      const data = await res.json();
+      setProjects(data.projects ?? []);
+    }
+    setOpenProjectId(entityId);
+  };
+
+  const openLead = async (entityId: string) => {
+    if (leads.length === 0) {
+      const res = await fetch("/api/leads");
+      const data = await res.json();
+      setLeads(data.leads ?? []);
+    }
+    setOpenLeadId(entityId);
+  };
+
+  const openMarketingItem = async (entityId: string) => {
+    let current = marketing;
+    if (!current) {
+      const [marketingRes, profileRes] = await Promise.all([
+        fetch("/api/marketing"),
+        fetch("/api/profile"),
+      ]);
+      const marketingData = await marketingRes.json();
+      const profileData = await profileRes.json();
+      current = marketingData.marketing ?? null;
+      setMarketing(current);
+      setCurrency(profileData.profile?.currency ?? "USD");
+    }
+    setOpenMarketingId(entityId);
+  };
+
   const openIdea = ads?.ideasForYou.find((i) => i.id === openAdIdeaId) ?? null;
+  const openTrending = openTrendingId ? findTrendingExample(ads, openTrendingId) : null;
+  const openProjectItem = projects.find((p) => p.id === openProjectId) ?? null;
+  const openLeadItem = leads.find((l) => l.id === openLeadId) ?? null;
+  const openMarketingItemResolved = openMarketingId ? findMarketingItem(marketing, openMarketingId) : null;
+
+  const openAction = (item: Assignment) => {
+    if (!item.entityId) return null;
+
+    if (item.entityType === "ad_idea") {
+      return (
+        <button
+          type="button"
+          onClick={() => openAdIdea(item.entityId!)}
+          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+        >
+          Open
+        </button>
+      );
+    }
+    if (item.entityType === "trending_ad") {
+      return (
+        <button
+          type="button"
+          onClick={() => openTrendingAd(item.entityId!)}
+          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+        >
+          Open
+        </button>
+      );
+    }
+    if (item.entityType === "project") {
+      return (
+        <button
+          type="button"
+          onClick={() => openProject(item.entityId!)}
+          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+        >
+          Open
+        </button>
+      );
+    }
+    if (item.entityType === "lead") {
+      return (
+        <button
+          type="button"
+          onClick={() => openLead(item.entityId!)}
+          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+        >
+          Open
+        </button>
+      );
+    }
+    if (item.entityType === "marketing" && item.entityId !== "marketing") {
+      return (
+        <button
+          type="button"
+          onClick={() => openMarketingItem(item.entityId!)}
+          className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
+        >
+          Open
+        </button>
+      );
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-6">
@@ -120,33 +270,7 @@ export default function TasksPage() {
                 <option value="done">Done</option>
               </select>
 
-              {item.entityType === "ad_idea" && item.entityId && (
-                <button
-                  type="button"
-                  onClick={() => openAdIdea(item.entityId!)}
-                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
-                >
-                  Open
-                </button>
-              )}
-
-              {item.entityType === "project" && item.entityId && (
-                <Link
-                  href={`/projects?focus=${item.entityId}`}
-                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
-                >
-                  Open
-                </Link>
-              )}
-
-              {item.entityType === "lead" && item.entityId && (
-                <Link
-                  href={`/leads?focus=${item.entityId}`}
-                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
-                >
-                  Open
-                </Link>
-              )}
+              {openAction(item)}
 
               {PAGE_LINKS[item.entityType] && (
                 <Link
@@ -166,6 +290,27 @@ export default function TasksPage() {
         onClose={() => setOpenAdIdeaId(null)}
         onIdeaUpdated={(updated) => setAds(updated)}
         contentPresets={ads?.contentPresets ?? []}
+      />
+      <TrendingAdDetailSheet
+        example={openTrending}
+        onClose={() => setOpenTrendingId(null)}
+        contentPresets={ads?.contentPresets ?? []}
+        onContentGenerated={(updated, idea) => {
+          setAds(updated);
+          setOpenTrendingId(null);
+          setOpenAdIdeaId(idea.id);
+        }}
+      />
+      <ProjectDetailSheet
+        project={openProjectItem}
+        onClose={() => setOpenProjectId(null)}
+        onUpdated={(p) => setProjects((list) => list.map((x) => (x.id === p.id ? p : x)))}
+      />
+      <LeadDetailSheet lead={openLeadItem} onClose={() => setOpenLeadId(null)} />
+      <CampaignDetailSheet
+        campaign={openMarketingItemResolved}
+        currency={currency}
+        onClose={() => setOpenMarketingId(null)}
       />
     </div>
   );

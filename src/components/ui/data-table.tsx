@@ -3,6 +3,7 @@
 import {
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnDef,
@@ -14,25 +15,39 @@ export function DataTable<T>({
   data,
   columns,
   onRowClick,
+  filterPlaceholder = "Filter…",
 }: {
   data: T[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: T) => void;
+  filterPlaceholder?: string;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
 
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, globalFilter },
     onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
   });
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-100">
+    <div className="space-y-2">
+      {data.length > 0 && (
+        <input
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          placeholder={filterPlaceholder}
+          className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+        />
+      )}
+      <div className="overflow-x-auto rounded-xl border border-slate-100">
       <table className="w-full min-w-[640px] text-left text-xs">
         <thead className="bg-slate-50 text-slate-500">
           {table.getHeaderGroups().map((hg) => (
@@ -70,9 +85,13 @@ export function DataTable<T>({
           ))}
         </tbody>
       </table>
-      {data.length === 0 && (
-        <p className="p-6 text-center text-sm text-slate-400">No data yet.</p>
-      )}
+        {data.length === 0 && (
+          <p className="p-6 text-center text-sm text-slate-400">No data yet.</p>
+        )}
+        {data.length > 0 && table.getRowModel().rows.length === 0 && (
+          <p className="p-6 text-center text-sm text-slate-400">No rows match your filter.</p>
+        )}
+      </div>
     </div>
   );
 }

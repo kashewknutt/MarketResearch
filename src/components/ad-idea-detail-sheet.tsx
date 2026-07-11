@@ -990,8 +990,8 @@ export function TrendingAdDetailSheet({
         <h2 className="text-base font-semibold text-slate-800">{example.title}</h2>
         <div className="flex items-center gap-2">
           <AssignTaskButton
-            entityType="freeform"
-            entityId={null}
+            entityType="trending_ad"
+            entityId={example.id}
             defaultTitle={`Look into trending ad: ${example.title}`}
           />
           <button

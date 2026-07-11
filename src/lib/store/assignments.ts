@@ -5,6 +5,7 @@ import { assignments, orgMembers } from "@/lib/db/schema";
 
 export const ASSIGNMENT_ENTITY_TYPES = [
   "ad_idea",
+  "trending_ad",
   "project",
   "lead",
   "financial",
