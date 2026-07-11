@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeCell } from "@/components/like-cell";
+import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
+import type { LikeCount } from "@/lib/store/likes";
 import { DataTable } from "@/components/ui/data-table";
 import { CitationList } from "@/components/ui/citation-list";
 import { Tabs } from "@/components/ui/tabs";
@@ -18,7 +21,11 @@ import type { ColumnDef } from "@tanstack/react-table";
 
 const itemCol = createColumnHelper<MarketingItem>();
 
-function campaignColumns(currency: string): ColumnDef<MarketingItem>[] {
+function campaignColumns(
+  currency: string,
+  likes: Record<string, LikeCount>,
+  toggle: (id: string) => void,
+): ColumnDef<MarketingItem>[] {
   return [
     itemCol.accessor("title", { header: "Campaign" }),
     itemCol.accessor("priority", { header: "Priority" }),
@@ -39,6 +46,13 @@ function campaignColumns(currency: string): ColumnDef<MarketingItem>[] {
       header: "Sources",
       cell: ({ row }) =>
         (row.original.citations?.length ?? 0) + row.original.provenance.citations.length,
+    }),
+    itemCol.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
     }),
   ] as ColumnDef<MarketingItem>[];
 }
@@ -67,6 +81,23 @@ export default function MarketingPage() {
   }, [load]);
 
   useAppRefresh(load, ["marketing", "all"]);
+
+  const allCampaignIds = useMemo(
+    () =>
+      marketing
+        ? [
+            ...marketing.contentThemes,
+            ...marketing.offers,
+            ...marketing.channels,
+            ...marketing.proofAssets,
+          ].map((c) => c.id)
+        : [],
+    [marketing],
+  );
+  const { likes: campaignLikes, toggle: toggleCampaignLike } = useLikeSummaries(
+    "marketing",
+    allCampaignIds,
+  );
 
   if (!marketing) {
     return (
@@ -120,8 +151,9 @@ export default function MarketingPage() {
           <p className="text-xs text-slate-500">Click a row for full campaign dossier.</p>
           <DataTable
             data={allCampaigns}
-            columns={campaignColumns(currency)}
+            columns={campaignColumns(currency, campaignLikes, toggleCampaignLike)}
             onRowClick={(row) => setSelectedCampaign(row)}
+            isLiked={(row) => campaignLikes[row.id]?.likedByMe ?? false}
           />
           <CampaignDetailSheet
             campaign={selectedCampaign}

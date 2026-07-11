@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
+import { LikeCell } from "@/components/like-cell";
+import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
 import type { LeadRecord } from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
@@ -42,6 +44,11 @@ function LeadsPageInner() {
     if (match) setSelected(match);
   }, [focusId, leads]);
 
+  const { likes, toggle } = useLikeSummaries(
+    "lead",
+    useMemo(() => leads.map((l) => l.id), [leads]),
+  );
+
   const columns = [
     col.accessor("company", { header: "Company" }),
     col.accessor("region", { header: "Region" }),
@@ -51,6 +58,13 @@ function LeadsPageInner() {
       id: "sources",
       header: "Sources",
       cell: ({ row }) => row.original.sources.length,
+    }),
+    col.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
     }),
   ] as ColumnDef<LeadRecord>[];
 
@@ -72,6 +86,7 @@ function LeadsPageInner() {
         data={leads}
         columns={columns}
         onRowClick={(row) => setSelected(row)}
+        isLiked={(row) => likes[row.id]?.likedByMe ?? false}
       />
 
       <LeadDetailSheet lead={selected} onClose={() => setSelected(null)} />

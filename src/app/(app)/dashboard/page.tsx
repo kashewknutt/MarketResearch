@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeCell } from "@/components/like-cell";
+import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
 import {
   Bar,
   BarChart,
@@ -54,6 +56,9 @@ export default function DashboardPage() {
 
   useAppRefresh(load, ["all"]);
 
+  const leadIds = useMemo(() => leads.map((l) => l.id), [leads]);
+  const { likes: leadLikes, toggle: toggleLeadLike } = useLikeSummaries("lead", leadIds);
+
   if (!profile || !metrics) {
     return <p className="text-sm text-slate-500">Loading dashboard…</p>;
   }
@@ -80,6 +85,13 @@ export default function DashboardPage() {
     { accessorKey: "region", header: "Region" },
     { accessorKey: "fitScore", header: "Fit" },
     { accessorKey: "whyFit", header: "Why" },
+    {
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={leadLikes[row.original.id]} onToggle={() => toggleLeadLike(row.original.id)} />
+      ),
+    },
   ];
 
   return (
@@ -153,7 +165,11 @@ export default function DashboardPage() {
       {leads.length > 0 && (
         <section>
           <h2 className="mb-4 text-sm font-semibold text-slate-700">Recent leads</h2>
-          <DataTable data={leads} columns={leadColumns} />
+          <DataTable
+            data={leads}
+            columns={leadColumns}
+            isLiked={(row) => leadLikes[row.id]?.likedByMe ?? false}
+          />
         </section>
       )}
 

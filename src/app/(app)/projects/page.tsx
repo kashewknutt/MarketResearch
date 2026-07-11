@@ -6,6 +6,8 @@ import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
+import { LikeCell } from "@/components/like-cell";
+import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
 import { formatMoney } from "@/lib/currency";
 import type { MarketProject } from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -52,6 +54,11 @@ function ProjectsPageInner() {
   const filtered =
     filter === "all" ? projects : projects.filter((p) => p.region === filter);
 
+  const { likes, toggle } = useLikeSummaries(
+    "project",
+    useMemo(() => filtered.map((p) => p.id), [filtered]),
+  );
+
   const columns = useMemo(
     () =>
       [
@@ -75,8 +82,15 @@ function ProjectsPageInner() {
           header: "Sources",
           cell: ({ row }) => row.original.provenance.citations?.length ?? 0,
         }),
+        col.display({
+          id: "liked",
+          header: "Liked",
+          cell: ({ row }) => (
+            <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+          ),
+        }),
       ] as ColumnDef<MarketProject>[],
-    [],
+    [likes, toggle],
   );
 
   return (
@@ -97,6 +111,7 @@ function ProjectsPageInner() {
         data={filtered}
         columns={columns}
         onRowClick={(row) => setSelected(row)}
+        isLiked={(row) => likes[row.id]?.likedByMe ?? false}
       />
       <ProjectDetailSheet
         project={selected}

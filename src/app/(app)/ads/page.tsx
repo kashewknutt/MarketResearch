@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
@@ -9,6 +9,9 @@ import {
   AdIdeaDetailSheet,
   TrendingAdDetailSheet,
 } from "@/components/ad-idea-detail-sheet";
+import { LikeCell } from "@/components/like-cell";
+import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
+import type { LikeCount } from "@/lib/store/likes";
 import type {
   AdIdea,
   AdTrendsSnapshot,
@@ -42,52 +45,76 @@ const STATUS_LABELS: Record<string, string> = {
   published_linkedin: "Published (LinkedIn)",
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ideaColumns: ColumnDef<AdIdea, any>[] = [
-  ideaCol.accessor("platform", { header: "Platform" }),
-  ideaCol.accessor("format", {
-    header: "Format",
-    cell: (i) => i.getValue().replace("_", " "),
-  }),
-  ideaCol.accessor("title", { header: "Idea" }),
-  ideaCol.accessor("priority", { header: "Priority" }),
-  ideaCol.accessor("status", {
-    header: "Status",
-    cell: (i) => STATUS_LABELS[i.getValue()] ?? i.getValue(),
-  }),
-];
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const exampleColumns: ColumnDef<TrendingAdExample, any>[] = [
-  exampleCol.accessor("platform", { header: "Platform" }),
-  exampleCol.display({
-    id: "brand",
-    header: "Brand",
-    cell: ({ row }) => (row.original.isOwnBrand ? "You" : row.original.brandName),
-  }),
-  exampleCol.accessor("format", {
-    header: "Format",
-    cell: (i) => i.getValue().replace("_", " "),
-  }),
-  exampleCol.accessor("title", { header: "Title" }),
-  exampleCol.accessor("engagementSignal", {
-    header: "Engagement",
-    cell: (i) => i.getValue() ?? "—",
-  }),
-  exampleCol.accessor("sourceType", {
-    header: "Source",
-    cell: (i) =>
-      i.getValue() === "scraped" ? (
-        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
-          ✓ Verified
-        </span>
-      ) : (
-        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
-          AI-estimated
-        </span>
+function buildIdeaColumns(
+  likes: Record<string, LikeCount>,
+  toggle: (id: string) => void,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): ColumnDef<AdIdea, any>[] {
+  return [
+    ideaCol.accessor("platform", { header: "Platform" }),
+    ideaCol.accessor("format", {
+      header: "Format",
+      cell: (i) => i.getValue().replace("_", " "),
+    }),
+    ideaCol.accessor("title", { header: "Idea" }),
+    ideaCol.accessor("priority", { header: "Priority" }),
+    ideaCol.accessor("status", {
+      header: "Status",
+      cell: (i) => STATUS_LABELS[i.getValue()] ?? i.getValue(),
+    }),
+    ideaCol.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
       ),
-  }),
-];
+    }),
+  ];
+}
+
+function buildExampleColumns(
+  likes: Record<string, LikeCount>,
+  toggle: (id: string) => void,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): ColumnDef<TrendingAdExample, any>[] {
+  return [
+    exampleCol.accessor("platform", { header: "Platform" }),
+    exampleCol.display({
+      id: "brand",
+      header: "Brand",
+      cell: ({ row }) => (row.original.isOwnBrand ? "You" : row.original.brandName),
+    }),
+    exampleCol.accessor("format", {
+      header: "Format",
+      cell: (i) => i.getValue().replace("_", " "),
+    }),
+    exampleCol.accessor("title", { header: "Title" }),
+    exampleCol.accessor("engagementSignal", {
+      header: "Engagement",
+      cell: (i) => i.getValue() ?? "—",
+    }),
+    exampleCol.accessor("sourceType", {
+      header: "Source",
+      cell: (i) =>
+        i.getValue() === "scraped" ? (
+          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-800">
+            ✓ Verified
+          </span>
+        ) : (
+          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-800">
+            AI-estimated
+          </span>
+        ),
+    }),
+    exampleCol.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
+    }),
+  ];
+}
 
 export default function AdsPage() {
   const [tab, setTab] = useState("overview");
@@ -172,6 +199,17 @@ export default function AdsPage() {
       setGeneratingMore(false);
     }
   }, [generateCount]);
+
+  const activeIdeaIds = useMemo(
+    () => (ads?.ideasForYou.filter((i) => !i.deletedAt).map((i) => i.id) ?? []),
+    [ads],
+  );
+  const trendingIds = useMemo(() => ads?.trendingNow.map((e) => e.id) ?? [], [ads]);
+  const { likes: ideaLikes, toggle: toggleIdeaLike } = useLikeSummaries("ad_idea", activeIdeaIds);
+  const { likes: trendingLikes, toggle: toggleTrendingLike } = useLikeSummaries(
+    "trending_ad",
+    trendingIds,
+  );
 
   if (!ads) {
     return (
@@ -425,8 +463,9 @@ export default function AdsPage() {
                 ? activeIdeas
                 : activeIdeas.filter((i) => i.status === statusFilter)
             }
-            columns={ideaColumns}
+            columns={buildIdeaColumns(ideaLikes, toggleIdeaLike)}
             onRowClick={setSelectedIdea}
+            isLiked={(row) => ideaLikes[row.id]?.likedByMe ?? false}
           />
         </div>
       )}
@@ -439,8 +478,9 @@ export default function AdsPage() {
           </p>
           <DataTable
             data={ads.trendingNow}
-            columns={exampleColumns}
+            columns={buildExampleColumns(trendingLikes, toggleTrendingLike)}
             onRowClick={setSelectedExample}
+            isLiked={(row) => trendingLikes[row.id]?.likedByMe ?? false}
           />
         </div>
       )}

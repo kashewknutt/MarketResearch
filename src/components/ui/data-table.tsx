@@ -16,18 +16,24 @@ export function DataTable<T>({
   columns,
   onRowClick,
   filterPlaceholder = "Filter…",
+  isLiked,
 }: {
   data: T[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: T) => void;
   filterPlaceholder?: string;
+  /** If provided, shows a "Liked only" toggle that filters rows down to ones this returns true for. */
+  isLiked?: (row: T) => boolean;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [likedOnly, setLikedOnly] = useState(false);
+
+  const visibleData = isLiked && likedOnly ? data.filter(isLiked) : data;
 
   const table = useReactTable({
-    data,
+    data: visibleData,
     columns,
     state: { sorting, globalFilter },
     onSortingChange: setSorting,
@@ -40,12 +46,25 @@ export function DataTable<T>({
   return (
     <div className="space-y-2">
       {data.length > 0 && (
-        <input
-          value={globalFilter}
-          onChange={(e) => setGlobalFilter(e.target.value)}
-          placeholder={filterPlaceholder}
-          className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            value={globalFilter}
+            onChange={(e) => setGlobalFilter(e.target.value)}
+            placeholder={filterPlaceholder}
+            className="w-full max-w-xs rounded-lg border border-slate-200 px-3 py-1.5 text-xs"
+          />
+          {isLiked && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={likedOnly}
+                onChange={(e) => setLikedOnly(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              ♥ Liked only
+            </label>
+          )}
+        </div>
       )}
       <div className="overflow-x-auto rounded-xl border border-slate-100">
       <table className="w-full min-w-[640px] text-left text-xs">

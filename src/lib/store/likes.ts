@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { likedItems } from "@/lib/db/schema";
 import { getProfilesByIds } from "@/lib/store/profiles";
@@ -41,6 +41,43 @@ export async function toggleLike(
     createdAt: new Date().toISOString(),
   });
   return true;
+}
+
+export interface LikeCount {
+  count: number;
+  likedByMe: boolean;
+}
+
+/** Lightweight batch version for table rows — no liker names, just counts/likedByMe per id. */
+export async function getLikeSummaries(
+  orgId: string,
+  entityType: LikeEntityType,
+  entityIds: string[],
+  currentUserId: string,
+): Promise<Record<string, LikeCount>> {
+  if (entityIds.length === 0) return {};
+
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(likedItems)
+    .where(
+      and(
+        eq(likedItems.orgId, orgId),
+        eq(likedItems.entityType, entityType),
+        inArray(likedItems.entityId, entityIds),
+      ),
+    );
+
+  const result: Record<string, LikeCount> = {};
+  for (const id of entityIds) result[id] = { count: 0, likedByMe: false };
+  for (const row of rows) {
+    const entry = result[row.entityId] ?? { count: 0, likedByMe: false };
+    entry.count += 1;
+    if (row.userId === currentUserId) entry.likedByMe = true;
+    result[row.entityId] = entry;
+  }
+  return result;
 }
 
 export async function getLikeSummary(
