@@ -159,6 +159,7 @@ export async function runSectionRefresh(
         jobId,
         existingAds?.trackedCompetitors,
         existingAds?.competitorSocialHandles,
+        existingAds?.ideasForYou,
       );
       await saveSnapshot("ads", mergeAdTrendsSnapshot(existingAds, ads));
       break;

@@ -1,5 +1,52 @@
 import type { AdIdea, AdIdeaSourceRef, CompetitorAdActivity, TrendingAdExample } from "@/lib/types/domain";
 
+const MAX_EXISTING_IDEA_CONTEXT = 40;
+
+/**
+ * Which trending/competitor examples already have an active (non-trashed)
+ * idea built from them. Derived live from the current ideas list rather
+ * than a persisted flag — deleting an idea frees its source back up.
+ */
+export function getUsedSourceIds(ideas: AdIdea[]): Set<string> {
+  const used = new Set<string>();
+  for (const idea of ideas) {
+    if (idea.deletedAt) continue;
+    if (idea.sourceRef?.exampleId) used.add(idea.sourceRef.exampleId);
+  }
+  return used;
+}
+
+/** Dedupes by id and drops anything already used as inspiration for an existing idea. */
+export function getUnusedExamples(
+  examples: TrendingAdExample[],
+  usedIds: Set<string>,
+): TrendingAdExample[] {
+  const seen = new Set<string>();
+  const result: TrendingAdExample[] = [];
+  for (const ex of examples) {
+    if (usedIds.has(ex.id) || seen.has(ex.id)) continue;
+    seen.add(ex.id);
+    result.push(ex);
+  }
+  return result;
+}
+
+/**
+ * Richer anti-repeat context than a bare title list — title, hook, format,
+ * and the source it was inspired by, so the model can avoid repeating the
+ * underlying concept/angle, not just dodge an exact title match.
+ */
+export function buildExistingIdeaContext(ideas: AdIdea[]): string {
+  const active = ideas.filter((i) => !i.deletedAt).slice(0, MAX_EXISTING_IDEA_CONTEXT);
+  if (active.length === 0) return "(none yet)";
+  return active
+    .map((i) => {
+      const source = i.sourceRef?.title ? ` [source: ${i.sourceRef.title}]` : "";
+      return `- "${i.title}" (${i.platform}/${i.format}) — hook: "${i.hook}"${source}`;
+    })
+    .join("\n");
+}
+
 export function buildExampleIndex(
   trendingNow: TrendingAdExample[],
   competitorActivity: CompetitorAdActivity[],

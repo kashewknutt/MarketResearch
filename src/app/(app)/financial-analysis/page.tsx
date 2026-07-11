@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { FinancialMetricGrid } from "@/components/financial-metric-grid";
 import {
   FinancialInflowOutflowChart,
@@ -128,12 +129,14 @@ export default function FinancialAnalysisPage() {
             Ambitious). Total Revenue, EBITDA, Net Profit, and margin are computed automatically.
           </p>
         </div>
-        <AssignTaskButton
-          entityType="financial"
-          entityId="financial"
-          defaultTitle="Follow up on financial analysis"
-          className="shrink-0"
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <LikeButton entityType="financial" entityId="financial" />
+          <AssignTaskButton
+            entityType="financial"
+            entityId="financial"
+            defaultTitle="Follow up on financial analysis"
+          />
+        </div>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

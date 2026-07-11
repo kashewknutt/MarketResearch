@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { EditableField } from "@/components/editable-field";
 import { currencyInputPrefix, formatMoney } from "@/lib/currency";
 import type { InvestmentSnapshot, OnboardingProfile } from "@/lib/types/domain";
@@ -76,12 +77,14 @@ export default function InvestmentPlannerPage() {
             {money(investment.totalRecommended)} recommended
           </p>
         </div>
-        <AssignTaskButton
-          entityType="investment"
-          entityId="investment"
-          defaultTitle="Follow up on investment plan"
-          className="shrink-0"
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <LikeButton entityType="investment" entityId="investment" />
+          <AssignTaskButton
+            entityType="investment"
+            entityId="investment"
+            defaultTitle="Follow up on investment plan"
+          />
+        </div>
       </header>
 
       <div className="space-y-4">

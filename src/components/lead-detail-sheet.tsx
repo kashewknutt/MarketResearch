@@ -1,6 +1,7 @@
 "use client";
 
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { CitationList } from "@/components/ui/citation-list";
 import type { LeadRecord } from "@/lib/types/domain";
 
@@ -17,6 +18,7 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">{lead.company}</h2>
         <div className="flex items-center gap-2">
+          <LikeButton entityType="lead" entityId={lead.id} />
           <AssignTaskButton
             entityType="lead"
             entityId={lead.id}

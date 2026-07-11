@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { EditableField } from "@/components/editable-field";
 import { ProjectCard } from "@/components/project-card";
 import type { MarketProject, StrategySnapshot } from "@/lib/types/domain";
@@ -55,12 +56,14 @@ export default function StrategyPage() {
             Understand targets, requirements, and where to focus.
           </p>
         </div>
-        <AssignTaskButton
-          entityType="strategy"
-          entityId="strategy"
-          defaultTitle="Follow up on strategy"
-          className="shrink-0"
-        />
+        <div className="flex shrink-0 items-center gap-2">
+          <LikeButton entityType="strategy" entityId="strategy" />
+          <AssignTaskButton
+            entityType="strategy"
+            entityId="strategy"
+            defaultTitle="Follow up on strategy"
+          />
+        </div>
       </header>
 
       <EditableField

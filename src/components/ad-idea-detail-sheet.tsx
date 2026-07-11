@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { CitationList } from "@/components/ui/citation-list";
 import type {
   AdIdea,
@@ -389,6 +390,7 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated, contentPresets
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">{idea.title}</h2>
         <div className="flex items-center gap-2">
+          <LikeButton entityType="ad_idea" entityId={idea.id} />
           <AssignTaskButton
             entityType="ad_idea"
             entityId={idea.id}
@@ -989,6 +991,7 @@ export function TrendingAdDetailSheet({
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">{example.title}</h2>
         <div className="flex items-center gap-2">
+          <LikeButton entityType="trending_ad" entityId={example.id} />
           <AssignTaskButton
             entityType="trending_ad"
             entityId={example.id}

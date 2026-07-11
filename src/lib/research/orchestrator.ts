@@ -312,6 +312,7 @@ export async function startResearchPipeline(jobId: string): Promise<void> {
         jobId,
         existingAds?.trackedCompetitors,
         existingAds?.competitorSocialHandles,
+        existingAds?.ideasForYou,
       );
       await saveSnapshot("ads", mergeAdTrendsSnapshot(existingAds, ads));
     });

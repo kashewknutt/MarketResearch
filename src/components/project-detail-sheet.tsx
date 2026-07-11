@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { EditableField } from "@/components/editable-field";
 import { CitationList } from "@/components/ui/citation-list";
 import { formatMoney } from "@/lib/currency";
@@ -93,6 +94,7 @@ export function ProjectDetailSheet({
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">Project analysis</h2>
         <div className="flex items-center gap-2">
+          <LikeButton entityType="project" entityId={project.id} />
           <AssignTaskButton
             entityType="project"
             entityId={project.id}

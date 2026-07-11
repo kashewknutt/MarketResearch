@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { useEffect, useState } from "react";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { LikeButton } from "@/components/like-button";
 import { CitationList } from "@/components/ui/citation-list";
 import { formatMoney } from "@/lib/currency";
 import type { MarketingItem } from "@/lib/types/domain";
@@ -57,6 +58,7 @@ export function CampaignDetailSheet({
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
         <h2 className="text-base font-semibold text-slate-800">{campaign.title}</h2>
         <div className="flex items-center gap-2">
+          <LikeButton entityType="marketing" entityId={campaign.id} />
           <AssignTaskButton
             entityType="marketing"
             entityId={campaign.id}

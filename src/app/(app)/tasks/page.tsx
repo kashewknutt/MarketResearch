@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AdIdeaDetailSheet, TrendingAdDetailSheet } from "@/components/ad-idea-detail-sheet";
+import { LikeButton } from "@/components/like-button";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
 import { CampaignDetailSheet } from "@/components/campaign-detail-sheet";
@@ -258,6 +259,7 @@ export default function TasksPage() {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <LikeButton entityType="task" entityId={item.id} />
               <select
                 value={item.status}
                 onChange={(e) =>

@@ -43,6 +43,20 @@ export const assignments = pgTable("assignments", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const likedItems = pgTable(
+  "liked_items",
+  {
+    orgId: uuid("org_id").notNull(),
+    userId: uuid("user_id").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.orgId, table.userId, table.entityType, table.entityId] }),
+  ],
+);
+
 export const appProfile = pgTable("app_profile", {
   orgId: uuid("org_id").primaryKey(),
   data: text("data").notNull(),
