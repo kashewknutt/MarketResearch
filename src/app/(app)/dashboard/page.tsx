@@ -81,10 +81,6 @@ export default function DashboardPage() {
   ];
 
   const leadColumns: ColumnDef<LeadRecord>[] = [
-    { accessorKey: "company", header: "Company" },
-    { accessorKey: "region", header: "Region" },
-    { accessorKey: "fitScore", header: "Fit" },
-    { accessorKey: "whyFit", header: "Why" },
     {
       id: "liked",
       header: "Liked",
@@ -92,6 +88,10 @@ export default function DashboardPage() {
         <LikeCell liked={leadLikes[row.original.id]} onToggle={() => toggleLeadLike(row.original.id)} />
       ),
     },
+    { accessorKey: "company", header: "Company" },
+    { accessorKey: "region", header: "Region" },
+    { accessorKey: "fitScore", header: "Fit" },
+    { accessorKey: "whyFit", header: "Why" },
   ];
 
   return (

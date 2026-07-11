@@ -57,5 +57,5 @@ export function useLikeSummaries(entityType: LikeEntityType, entityIds: string[]
     [entityType, load],
   );
 
-  return { likes, toggle };
+  return { likes, toggle, refresh: load };
 }

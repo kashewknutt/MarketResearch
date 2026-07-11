@@ -54,7 +54,7 @@ function ProjectsPageInner() {
   const filtered =
     filter === "all" ? projects : projects.filter((p) => p.region === filter);
 
-  const { likes, toggle } = useLikeSummaries(
+  const { likes, toggle, refresh } = useLikeSummaries(
     "project",
     useMemo(() => filtered.map((p) => p.id), [filtered]),
   );
@@ -62,6 +62,13 @@ function ProjectsPageInner() {
   const columns = useMemo(
     () =>
       [
+        col.display({
+          id: "liked",
+          header: "Liked",
+          cell: ({ row }) => (
+            <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+          ),
+        }),
         col.accessor("title", { header: "Project", cell: (i) => i.getValue() }),
         col.accessor("region", { header: "Region" }),
         col.accessor("effort", { header: "Effort" }),
@@ -81,13 +88,6 @@ function ProjectsPageInner() {
           id: "sources",
           header: "Sources",
           cell: ({ row }) => row.original.provenance.citations?.length ?? 0,
-        }),
-        col.display({
-          id: "liked",
-          header: "Liked",
-          cell: ({ row }) => (
-            <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
-          ),
         }),
       ] as ColumnDef<MarketProject>[],
     [likes, toggle],
@@ -115,7 +115,10 @@ function ProjectsPageInner() {
       />
       <ProjectDetailSheet
         project={selected}
-        onClose={() => setSelected(null)}
+        onClose={() => {
+          setSelected(null);
+          refresh();
+        }}
         onUpdated={(p) => {
           setProjects((list) => list.map((x) => (x.id === p.id ? p : x)));
           setSelected(p);

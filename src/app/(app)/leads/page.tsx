@@ -44,12 +44,19 @@ function LeadsPageInner() {
     if (match) setSelected(match);
   }, [focusId, leads]);
 
-  const { likes, toggle } = useLikeSummaries(
+  const { likes, toggle, refresh } = useLikeSummaries(
     "lead",
     useMemo(() => leads.map((l) => l.id), [leads]),
   );
 
   const columns = [
+    col.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
+    }),
     col.accessor("company", { header: "Company" }),
     col.accessor("region", { header: "Region" }),
     col.accessor("fitScore", { header: "Fit score" }),
@@ -58,13 +65,6 @@ function LeadsPageInner() {
       id: "sources",
       header: "Sources",
       cell: ({ row }) => row.original.sources.length,
-    }),
-    col.display({
-      id: "liked",
-      header: "Liked",
-      cell: ({ row }) => (
-        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
-      ),
     }),
   ] as ColumnDef<LeadRecord>[];
 
@@ -89,7 +89,13 @@ function LeadsPageInner() {
         isLiked={(row) => likes[row.id]?.likedByMe ?? false}
       />
 
-      <LeadDetailSheet lead={selected} onClose={() => setSelected(null)} />
+      <LeadDetailSheet
+        lead={selected}
+        onClose={() => {
+          setSelected(null);
+          refresh();
+        }}
+      />
     </div>
   );
 }

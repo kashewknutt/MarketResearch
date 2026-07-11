@@ -27,6 +27,13 @@ function campaignColumns(
   toggle: (id: string) => void,
 ): ColumnDef<MarketingItem>[] {
   return [
+    itemCol.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
+    }),
     itemCol.accessor("title", { header: "Campaign" }),
     itemCol.accessor("priority", { header: "Priority" }),
     itemCol.accessor("why", {
@@ -46,13 +53,6 @@ function campaignColumns(
       header: "Sources",
       cell: ({ row }) =>
         (row.original.citations?.length ?? 0) + row.original.provenance.citations.length,
-    }),
-    itemCol.display({
-      id: "liked",
-      header: "Liked",
-      cell: ({ row }) => (
-        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
-      ),
     }),
   ] as ColumnDef<MarketingItem>[];
 }
@@ -94,7 +94,11 @@ export default function MarketingPage() {
         : [],
     [marketing],
   );
-  const { likes: campaignLikes, toggle: toggleCampaignLike } = useLikeSummaries(
+  const {
+    likes: campaignLikes,
+    toggle: toggleCampaignLike,
+    refresh: refreshCampaignLikes,
+  } = useLikeSummaries(
     "marketing",
     allCampaignIds,
   );
@@ -158,7 +162,10 @@ export default function MarketingPage() {
           <CampaignDetailSheet
             campaign={selectedCampaign}
             currency={currency}
-            onClose={() => setSelectedCampaign(null)}
+            onClose={() => {
+              setSelectedCampaign(null);
+              refreshCampaignLikes();
+            }}
           />
         </div>
       )}

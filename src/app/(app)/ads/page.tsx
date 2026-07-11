@@ -51,6 +51,13 @@ function buildIdeaColumns(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): ColumnDef<AdIdea, any>[] {
   return [
+    ideaCol.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
+    }),
     ideaCol.accessor("platform", { header: "Platform" }),
     ideaCol.accessor("format", {
       header: "Format",
@@ -62,13 +69,6 @@ function buildIdeaColumns(
       header: "Status",
       cell: (i) => STATUS_LABELS[i.getValue()] ?? i.getValue(),
     }),
-    ideaCol.display({
-      id: "liked",
-      header: "Liked",
-      cell: ({ row }) => (
-        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
-      ),
-    }),
   ];
 }
 
@@ -78,6 +78,13 @@ function buildExampleColumns(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): ColumnDef<TrendingAdExample, any>[] {
   return [
+    exampleCol.display({
+      id: "liked",
+      header: "Liked",
+      cell: ({ row }) => (
+        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+      ),
+    }),
     exampleCol.accessor("platform", { header: "Platform" }),
     exampleCol.display({
       id: "brand",
@@ -105,13 +112,6 @@ function buildExampleColumns(
             AI-estimated
           </span>
         ),
-    }),
-    exampleCol.display({
-      id: "liked",
-      header: "Liked",
-      cell: ({ row }) => (
-        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
-      ),
     }),
   ];
 }
@@ -205,11 +205,16 @@ export default function AdsPage() {
     [ads],
   );
   const trendingIds = useMemo(() => ads?.trendingNow.map((e) => e.id) ?? [], [ads]);
-  const { likes: ideaLikes, toggle: toggleIdeaLike } = useLikeSummaries("ad_idea", activeIdeaIds);
-  const { likes: trendingLikes, toggle: toggleTrendingLike } = useLikeSummaries(
-    "trending_ad",
-    trendingIds,
-  );
+  const {
+    likes: ideaLikes,
+    toggle: toggleIdeaLike,
+    refresh: refreshIdeaLikes,
+  } = useLikeSummaries("ad_idea", activeIdeaIds);
+  const {
+    likes: trendingLikes,
+    toggle: toggleTrendingLike,
+    refresh: refreshTrendingLikes,
+  } = useLikeSummaries("trending_ad", trendingIds);
 
   if (!ads) {
     return (
@@ -643,13 +648,19 @@ export default function AdsPage() {
 
       <AdIdeaDetailSheet
         idea={selectedIdea}
-        onClose={() => setSelectedIdea(null)}
+        onClose={() => {
+          setSelectedIdea(null);
+          refreshIdeaLikes();
+        }}
         onIdeaUpdated={handleIdeaUpdated}
         contentPresets={contentPresets}
       />
       <TrendingAdDetailSheet
         example={selectedExample}
-        onClose={() => setSelectedExample(null)}
+        onClose={() => {
+          setSelectedExample(null);
+          refreshTrendingLikes();
+        }}
         contentPresets={contentPresets}
         onContentGenerated={(updated, idea) => {
           setAds(updated);
