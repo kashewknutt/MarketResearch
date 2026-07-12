@@ -6,16 +6,8 @@ export async function GET() {
   const { orgId, role } = await getCurrentOrg();
   const userId = await getCurrentUserId();
   const org = await getOrg(orgId);
-
-  if (role !== "owner") {
-    return NextResponse.json({
-      org: org ? { id: org.id, name: org.name, slug: org.slug } : null,
-      role,
-      members: null,
-    });
-  }
-
   const members = await getOrgMembers(orgId);
+
   return NextResponse.json({
     org: org ? { id: org.id, name: org.name, slug: org.slug } : null,
     role,

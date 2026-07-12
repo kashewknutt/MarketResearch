@@ -24,6 +24,17 @@ interface CommentThreadProps {
   className?: string;
 }
 
+interface ActiveMention {
+  start: number;
+  end: number;
+  query: string;
+}
+
+interface SelectedMention {
+  userId: string;
+  label: string;
+}
+
 function displayName(person: { fullName?: string | null; email?: string | null; userId?: string }): string {
   return person.fullName ?? person.email ?? person.userId ?? "Unknown";
 }
@@ -37,6 +48,20 @@ function relativeTime(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   return `${days}d ago`;
+}
+
+function getActiveMention(value: string, caret: number): ActiveMention | null {
+  const uptoCaret = value.slice(0, caret);
+  const atIndex = uptoCaret.lastIndexOf("@");
+  if (atIndex === -1) return null;
+
+  const previousChar = atIndex === 0 ? "" : value[atIndex - 1];
+  if (previousChar && !/\s/.test(previousChar)) return null;
+
+  const query = value.slice(atIndex + 1, caret);
+  if (/\s/.test(query)) return null;
+
+  return { start: atIndex, end: caret, query };
 }
 
 function renderBody(body: string, mentionedUserIds: string[], members: OrgMemberOption[]) {
@@ -66,15 +91,14 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
-  const [mentionedUserIds, setMentionedUserIds] = useState<string[]>([]);
-  const [showPicker, setShowPicker] = useState(false);
+  const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
+  const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/comments?entityType=${entityType}&entityId=${encodeURIComponent(entityId)}`)
       .then((res) => res.json())
       .then((body) => {
@@ -88,21 +112,44 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
     };
   }, [entityType, entityId]);
 
-  const availableMembers = useMemo(
-    () => members.filter((m) => !mentionedUserIds.includes(m.userId)),
-    [members, mentionedUserIds],
-  );
+  const availableMembers = useMemo(() => {
+    const query = activeMention?.query.trim().toLowerCase() ?? "";
+    return members.filter((member) => {
+      if (selectedMentions.some((mention) => mention.userId === member.userId)) {
+        return false;
+      }
 
-  function handleTextChange(value: string) {
+      if (!query) return true;
+
+      const name = displayName(member).toLowerCase();
+      const email = member.email?.toLowerCase() ?? "";
+      return name.includes(query) || email.includes(query);
+    });
+  }, [activeMention?.query, members, selectedMentions]);
+
+  function handleTextChange(value: string, caret: number) {
     setText(value);
-    setShowPicker(value.endsWith("@"));
+    setSelectedMentions((prev) => prev.filter((mention) => value.includes(`@${mention.label}`)));
+    setActiveMention(getActiveMention(value, caret));
   }
 
   function pickMention(member: OrgMemberOption) {
-    setText((prev) => `${prev.slice(0, -1)}@${displayName(member)} `);
-    setMentionedUserIds((prev) => [...prev, member.userId]);
-    setShowPicker(false);
-    textareaRef.current?.focus();
+    if (!activeMention) return;
+
+    const label = displayName(member);
+    const nextText = `${text.slice(0, activeMention.start)}@${label} ${text.slice(activeMention.end)}`;
+    const nextCaretPosition = activeMention.start + label.length + 2;
+
+    setText(nextText);
+    setSelectedMentions((prev) =>
+      prev.some((mention) => mention.userId === member.userId) ? prev : [...prev, { userId: member.userId, label }],
+    );
+    setActiveMention(null);
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(nextCaretPosition, nextCaretPosition);
+    });
   }
 
   async function submit() {
@@ -114,7 +161,12 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entityType, entityId, body, mentionedUserIds }),
+        body: JSON.stringify({
+          entityType,
+          entityId,
+          body,
+          mentionedUserIds: selectedMentions.map((mention) => mention.userId),
+        }),
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
@@ -123,7 +175,8 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
       const { comment } = await res.json();
       setComments((prev) => [...prev, comment]);
       setText("");
-      setMentionedUserIds([]);
+      setSelectedMentions([]);
+      setActiveMention(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not post comment");
     } finally {
@@ -159,13 +212,13 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={(e) => handleTextChange(e.target.value)}
+          onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
           placeholder="Add a comment… type @ to mention someone"
           rows={2}
           className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
         />
 
-        {showPicker && availableMembers.length > 0 && (
+        {activeMention && availableMembers.length > 0 && (
           <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-slate-100 bg-white p-1 shadow-lg">
             {availableMembers.map((m) => (
               <button
