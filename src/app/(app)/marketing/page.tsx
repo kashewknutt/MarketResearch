@@ -82,7 +82,7 @@ export default function MarketingPage() {
 
   useAppRefresh(load, ["marketing", "all"]);
 
-  const allCampaignIds = useMemo(
+  const allCampaigns = useMemo(
     () =>
       marketing
         ? [
@@ -90,17 +90,23 @@ export default function MarketingPage() {
             ...marketing.offers,
             ...marketing.channels,
             ...marketing.proofAssets,
-          ].map((c) => c.id)
+          ]
         : [],
     [marketing],
   );
+  const allCampaignIds = useMemo(() => allCampaigns.map((c) => c.id), [allCampaigns]);
   const {
     likes: campaignLikes,
     toggle: toggleCampaignLike,
     refresh: refreshCampaignLikes,
-  } = useLikeSummaries(
-    "marketing",
-    allCampaignIds,
+  } = useLikeSummaries("marketing", allCampaignIds);
+  const campaignColumnsMemo = useMemo(
+    () => campaignColumns(currency, campaignLikes, toggleCampaignLike),
+    [currency, campaignLikes, toggleCampaignLike],
+  );
+  const isCampaignLiked = useCallback(
+    (row: MarketingItem) => campaignLikes[row.id]?.likedByMe ?? false,
+    [campaignLikes],
   );
 
   if (!marketing) {
@@ -111,13 +117,6 @@ export default function MarketingPage() {
       </div>
     );
   }
-
-  const allCampaigns = [
-    ...marketing.contentThemes,
-    ...marketing.offers,
-    ...marketing.channels,
-    ...marketing.proofAssets,
-  ];
 
   return (
     <div className="space-y-6">
@@ -155,9 +154,9 @@ export default function MarketingPage() {
           <p className="text-xs text-slate-500">Click a row for full campaign dossier.</p>
           <DataTable
             data={allCampaigns}
-            columns={campaignColumns(currency, campaignLikes, toggleCampaignLike)}
+            columns={campaignColumnsMemo}
             onRowClick={(row) => setSelectedCampaign(row)}
-            isLiked={(row) => campaignLikes[row.id]?.likedByMe ?? false}
+            isLiked={isCampaignLiked}
           />
           <CampaignDetailSheet
             campaign={selectedCampaign}

@@ -51,13 +51,17 @@ function ProjectsPageInner() {
     if (match) setSelected(match);
   }, [focusId, projects]);
 
-  const filtered =
-    filter === "all" ? projects : projects.filter((p) => p.region === filter);
+  const filtered = useMemo(
+    () => (filter === "all" ? projects : projects.filter((p) => p.region === filter)),
+    [projects, filter],
+  );
 
   const { likes, toggle, refresh } = useLikeSummaries(
     "project",
     useMemo(() => filtered.map((p) => p.id), [filtered]),
   );
+
+  const isLiked = useCallback((row: MarketProject) => likes[row.id]?.likedByMe ?? false, [likes]);
 
   const columns = useMemo(
     () =>
@@ -111,7 +115,7 @@ function ProjectsPageInner() {
         data={filtered}
         columns={columns}
         onRowClick={(row) => setSelected(row)}
-        isLiked={(row) => likes[row.id]?.likedByMe ?? false}
+        isLiked={isLiked}
       />
       <ProjectDetailSheet
         project={selected}

@@ -200,10 +200,15 @@ export default function AdsPage() {
     }
   }, [generateCount]);
 
-  const activeIdeaIds = useMemo(
-    () => (ads?.ideasForYou.filter((i) => !i.deletedAt).map((i) => i.id) ?? []),
+  const activeIdeas = useMemo(
+    () => ads?.ideasForYou.filter((i) => !i.deletedAt) ?? [],
     [ads],
   );
+  const trashedIdeas = useMemo(
+    () => ads?.ideasForYou.filter((i) => i.deletedAt) ?? [],
+    [ads],
+  );
+  const activeIdeaIds = useMemo(() => activeIdeas.map((i) => i.id), [activeIdeas]);
   const trendingIds = useMemo(() => ads?.trendingNow.map((e) => e.id) ?? [], [ads]);
   const {
     likes: ideaLikes,
@@ -216,6 +221,30 @@ export default function AdsPage() {
     refresh: refreshTrendingLikes,
   } = useLikeSummaries("trending_ad", trendingIds);
 
+  const ideaColumns = useMemo(
+    () => buildIdeaColumns(ideaLikes, toggleIdeaLike),
+    [ideaLikes, toggleIdeaLike],
+  );
+  const exampleColumns = useMemo(
+    () => buildExampleColumns(trendingLikes, toggleTrendingLike),
+    [trendingLikes, toggleTrendingLike],
+  );
+  const isIdeaLiked = useCallback(
+    (row: AdIdea) => ideaLikes[row.id]?.likedByMe ?? false,
+    [ideaLikes],
+  );
+  const isTrendingLiked = useCallback(
+    (row: TrendingAdExample) => trendingLikes[row.id]?.likedByMe ?? false,
+    [trendingLikes],
+  );
+  const visibleIdeas = useMemo(
+    () =>
+      statusFilter === "all"
+        ? activeIdeas
+        : activeIdeas.filter((i) => i.status === statusFilter),
+    [activeIdeas, statusFilter],
+  );
+
   if (!ads) {
     return (
       <div className="space-y-6">
@@ -227,8 +256,6 @@ export default function AdsPage() {
 
   const contentPresets =
     ads.contentPresets && ads.contentPresets.length > 0 ? ads.contentPresets : DEFAULT_CONTENT_PRESETS;
-  const activeIdeas = ads.ideasForYou.filter((i) => !i.deletedAt);
-  const trashedIdeas = ads.ideasForYou.filter((i) => i.deletedAt);
 
   const restoreIdea = async (id: string) => {
     const res = await fetch(`/api/ads/ideas/${id}/restore`, { method: "POST" });
@@ -463,14 +490,10 @@ export default function AdsPage() {
           </div>
 
           <DataTable
-            data={
-              statusFilter === "all"
-                ? activeIdeas
-                : activeIdeas.filter((i) => i.status === statusFilter)
-            }
-            columns={buildIdeaColumns(ideaLikes, toggleIdeaLike)}
+            data={visibleIdeas}
+            columns={ideaColumns}
             onRowClick={setSelectedIdea}
-            isLiked={(row) => ideaLikes[row.id]?.likedByMe ?? false}
+            isLiked={isIdeaLiked}
           />
         </div>
       )}
@@ -483,9 +506,9 @@ export default function AdsPage() {
           </p>
           <DataTable
             data={ads.trendingNow}
-            columns={buildExampleColumns(trendingLikes, toggleTrendingLike)}
+            columns={exampleColumns}
             onRowClick={setSelectedExample}
-            isLiked={(row) => trendingLikes[row.id]?.likedByMe ?? false}
+            isLiked={isTrendingLiked}
           />
         </div>
       )}

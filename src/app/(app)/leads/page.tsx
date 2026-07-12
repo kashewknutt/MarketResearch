@@ -49,24 +49,30 @@ function LeadsPageInner() {
     useMemo(() => leads.map((l) => l.id), [leads]),
   );
 
-  const columns = [
-    col.display({
-      id: "liked",
-      header: "Liked",
-      cell: ({ row }) => (
-        <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
-      ),
-    }),
-    col.accessor("company", { header: "Company" }),
-    col.accessor("region", { header: "Region" }),
-    col.accessor("fitScore", { header: "Fit score" }),
-    col.accessor("status", { header: "Status" }),
-    col.display({
-      id: "sources",
-      header: "Sources",
-      cell: ({ row }) => row.original.sources.length,
-    }),
-  ] as ColumnDef<LeadRecord>[];
+  const columns = useMemo(
+    () =>
+      [
+        col.display({
+          id: "liked",
+          header: "Liked",
+          cell: ({ row }) => (
+            <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
+          ),
+        }),
+        col.accessor("company", { header: "Company" }),
+        col.accessor("region", { header: "Region" }),
+        col.accessor("fitScore", { header: "Fit score" }),
+        col.accessor("status", { header: "Status" }),
+        col.display({
+          id: "sources",
+          header: "Sources",
+          cell: ({ row }) => row.original.sources.length,
+        }),
+      ] as ColumnDef<LeadRecord>[],
+    [likes, toggle],
+  );
+
+  const isLiked = useCallback((row: LeadRecord) => likes[row.id]?.likedByMe ?? false, [likes]);
 
   return (
     <div className="space-y-6">
@@ -86,7 +92,7 @@ function LeadsPageInner() {
         data={leads}
         columns={columns}
         onRowClick={(row) => setSelected(row)}
-        isLiked={(row) => likes[row.id]?.likedByMe ?? false}
+        isLiked={isLiked}
       />
 
       <LeadDetailSheet

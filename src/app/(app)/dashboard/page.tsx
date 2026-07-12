@@ -59,6 +59,42 @@ export default function DashboardPage() {
   const leadIds = useMemo(() => leads.map((l) => l.id), [leads]);
   const { likes: leadLikes, toggle: toggleLeadLike } = useLikeSummaries("lead", leadIds);
 
+  const competitorColumns: ColumnDef<CompetitorSnapshot["competitors"][0]>[] = useMemo(
+    () => [
+      { accessorKey: "name", header: "Competitor" },
+      {
+        id: "spend",
+        header: `Est. marketing spend (${competitors?.spendCurrency ?? metrics?.currency})`,
+        cell: ({ row }) =>
+          `${formatMoney(row.original.estimatedMarketingSpendMin, row.original.spendCurrency)} – ${formatMoney(row.original.estimatedMarketingSpendMax, row.original.spendCurrency)}`,
+      },
+      { accessorKey: "positioning", header: "Positioning" },
+    ],
+    [competitors?.spendCurrency, metrics?.currency],
+  );
+
+  const leadColumns: ColumnDef<LeadRecord>[] = useMemo(
+    () => [
+      {
+        id: "liked",
+        header: "Liked",
+        cell: ({ row }) => (
+          <LikeCell liked={leadLikes[row.original.id]} onToggle={() => toggleLeadLike(row.original.id)} />
+        ),
+      },
+      { accessorKey: "company", header: "Company" },
+      { accessorKey: "region", header: "Region" },
+      { accessorKey: "fitScore", header: "Fit" },
+      { accessorKey: "whyFit", header: "Why" },
+    ],
+    [leadLikes, toggleLeadLike],
+  );
+
+  const isLeadLiked = useCallback(
+    (row: LeadRecord) => leadLikes[row.id]?.likedByMe ?? false,
+    [leadLikes],
+  );
+
   if (!profile || !metrics) {
     return <p className="text-sm text-slate-500">Loading dashboard…</p>;
   }
@@ -68,31 +104,6 @@ export default function DashboardPage() {
     region,
     count,
   }));
-
-  const competitorColumns: ColumnDef<CompetitorSnapshot["competitors"][0]>[] = [
-    { accessorKey: "name", header: "Competitor" },
-    {
-      id: "spend",
-      header: `Est. marketing spend (${competitors?.spendCurrency ?? metrics.currency})`,
-      cell: ({ row }) =>
-        `${formatMoney(row.original.estimatedMarketingSpendMin, row.original.spendCurrency)} – ${formatMoney(row.original.estimatedMarketingSpendMax, row.original.spendCurrency)}`,
-    },
-    { accessorKey: "positioning", header: "Positioning" },
-  ];
-
-  const leadColumns: ColumnDef<LeadRecord>[] = [
-    {
-      id: "liked",
-      header: "Liked",
-      cell: ({ row }) => (
-        <LikeCell liked={leadLikes[row.original.id]} onToggle={() => toggleLeadLike(row.original.id)} />
-      ),
-    },
-    { accessorKey: "company", header: "Company" },
-    { accessorKey: "region", header: "Region" },
-    { accessorKey: "fitScore", header: "Fit" },
-    { accessorKey: "whyFit", header: "Why" },
-  ];
 
   return (
     <div className="space-y-10">
@@ -165,11 +176,7 @@ export default function DashboardPage() {
       {leads.length > 0 && (
         <section>
           <h2 className="mb-4 text-sm font-semibold text-slate-700">Recent leads</h2>
-          <DataTable
-            data={leads}
-            columns={leadColumns}
-            isLiked={(row) => leadLikes[row.id]?.likedByMe ?? false}
-          />
+          <DataTable data={leads} columns={leadColumns} isLiked={isLeadLiked} />
         </section>
       )}
 

@@ -9,7 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 export function DataTable<T>({
   data,
@@ -30,7 +30,10 @@ export function DataTable<T>({
   const [globalFilter, setGlobalFilter] = useState("");
   const [likedOnly, setLikedOnly] = useState(false);
 
-  const visibleData = isLiked && likedOnly ? data.filter(isLiked) : data;
+  const visibleData = useMemo(
+    () => (isLiked && likedOnly ? data.filter(isLiked) : data),
+    [data, isLiked, likedOnly],
+  );
 
   const table = useReactTable({
     data: visibleData,
