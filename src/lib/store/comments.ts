@@ -170,8 +170,16 @@ export async function getMentionsForUser(
 
   const profiles = await getProfilesByIds(commentRows.map((r) => r.authorUserId));
   const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const latestByEntity = new Map<string, (typeof commentRows)[number]>();
 
-  return commentRows.map((row) => {
+  for (const row of commentRows) {
+    const key = `${row.entityType}:${row.entityId}`;
+    if (!latestByEntity.has(key)) {
+      latestByEntity.set(key, row);
+    }
+  }
+
+  return Array.from(latestByEntity.values()).map((row) => {
     const profile = profileById.get(row.authorUserId);
     return {
       commentId: row.id,
