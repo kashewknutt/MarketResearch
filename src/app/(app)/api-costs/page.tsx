@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
+import { PageLoading } from "@/components/ui/page-loading";
 import type { ApiCostEventRecord } from "@/lib/ai/pricing-types";
 import type { ModelPricingRates } from "@/lib/ai/pricing-types";
 
@@ -59,7 +60,7 @@ export default function ApiCostsPage() {
   };
 
   if (loading && !data) {
-    return <p className="text-sm text-slate-500">Loading cost data…</p>;
+    return <PageLoading label="Loading cost data…" />;
   }
 
   const s = data?.summary;

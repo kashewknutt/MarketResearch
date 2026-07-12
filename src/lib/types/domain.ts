@@ -373,6 +373,12 @@ export interface LeadRecord {
   status: LeadStatus;
   provenance: Provenance;
   createdAt: string;
+  contactName?: string;
+  contactTitle?: string;
+  contactLinkedInUrl?: string;
+  outreachMessage?: string;
+  outreachStatus?: "none" | "contact_found" | "drafted" | "sent";
+  outreachUpdatedAt?: string;
 }
 
 export interface CompetitorRecord {

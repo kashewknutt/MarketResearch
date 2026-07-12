@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { CommentThread } from "@/components/comment-thread";
 import { LikeButton } from "@/components/like-button";
 import { EditableField } from "@/components/editable-field";
 import { CitationList } from "@/components/ui/citation-list";
@@ -262,6 +263,8 @@ export function ProjectDetailSheet({
           />
           <span className="text-sm text-slate-700">Mark as done (AI will fetch 1 new project)</span>
         </label>
+
+        <CommentThread entityType="project" entityId={project.id} />
       </div>
     </div>
   );

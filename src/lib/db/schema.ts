@@ -57,6 +57,27 @@ export const likedItems = pgTable(
   ],
 );
 
+export const comments = pgTable("comments", {
+  id: text("id").primaryKey(),
+  orgId: uuid("org_id").notNull(),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  authorUserId: uuid("author_user_id").notNull(),
+  body: text("body").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const commentMentions = pgTable(
+  "comment_mentions",
+  {
+    commentId: text("comment_id").notNull(),
+    orgId: uuid("org_id").notNull(),
+    mentionedUserId: uuid("mentioned_user_id").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.commentId, table.mentionedUserId] })],
+);
+
 export const appProfile = pgTable("app_profile", {
   orgId: uuid("org_id").primaryKey(),
   data: text("data").notNull(),

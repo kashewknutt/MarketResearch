@@ -9,6 +9,7 @@ import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
 import type { LikeCount } from "@/lib/store/likes";
 import { DataTable } from "@/components/ui/data-table";
 import { CitationList } from "@/components/ui/citation-list";
+import { PageLoading } from "@/components/ui/page-loading";
 import { Tabs } from "@/components/ui/tabs";
 import { CampaignDetailSheet } from "@/components/campaign-detail-sheet";
 import { formatMoney } from "@/lib/currency";
@@ -63,17 +64,20 @@ export default function MarketingPage() {
   const [social, setSocial] = useState<MarketingSocialSnapshot | null>(null);
   const [currency, setCurrency] = useState("USD");
   const [selectedCampaign, setSelectedCampaign] = useState<MarketingItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
-    fetch("/api/marketing")
-      .then((r) => r.json())
-      .then((d) => setMarketing(d.marketing));
-    fetch("/api/marketing/social")
-      .then((r) => r.json())
-      .then((d) => setSocial(d.social));
-    fetch("/api/profile")
-      .then((r) => r.json())
-      .then((d) => setCurrency(d.profile?.currency ?? "USD"));
+    Promise.all([
+      fetch("/api/marketing")
+        .then((r) => r.json())
+        .then((d) => setMarketing(d.marketing)),
+      fetch("/api/marketing/social")
+        .then((r) => r.json())
+        .then((d) => setSocial(d.social)),
+      fetch("/api/profile")
+        .then((r) => r.json())
+        .then((d) => setCurrency(d.profile?.currency ?? "USD")),
+    ]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -108,6 +112,15 @@ export default function MarketingPage() {
     (row: MarketingItem) => campaignLikes[row.id]?.likedByMe ?? false,
     [campaignLikes],
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-slate-800">Marketing</h1>
+        <PageLoading label="Loading marketing…" />
+      </div>
+    );
+  }
 
   if (!marketing) {
     return (

@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { useEffect, useState } from "react";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { CommentThread } from "@/components/comment-thread";
 import { LikeButton } from "@/components/like-button";
 import { CitationList } from "@/components/ui/citation-list";
 import { formatMoney } from "@/lib/currency";
@@ -208,6 +209,8 @@ export function CampaignDetailSheet({
           <p className="text-sm font-medium text-slate-800">Citations</p>
           <CitationList citations={allCitations} />
         </section>
+
+        <CommentThread entityType="marketing" entityId={campaign.id} />
       </div>
     </div>
   );

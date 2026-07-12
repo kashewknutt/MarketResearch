@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { RevenueGoalFields } from "@/components/revenue-goal-fields";
 import { SocialLinksFields } from "@/components/social-links-fields";
+import { PageLoading } from "@/components/ui/page-loading";
 import { DEFAULT_REGIONS, type OnboardingProfile, type RegionCode } from "@/lib/types/domain";
 import type { GeminiConnectionStatus } from "@/lib/ai/gemini";
 
@@ -64,7 +65,7 @@ function SettingsContent() {
   };
 
   if (!profile) {
-    return <p className="text-sm text-slate-500">Loading settings…</p>;
+    return <PageLoading label="Loading settings…" />;
   }
 
   return (

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AssignTaskButton } from "@/components/assign-task-button";
+import { CommentThread } from "@/components/comment-thread";
 import { LikeButton } from "@/components/like-button";
 import { CitationList } from "@/components/ui/citation-list";
 import type {
@@ -912,6 +913,8 @@ export function AdIdeaDetailSheet({ idea, onClose, onIdeaUpdated, contentPresets
             )}
           </section>
         )}
+
+        <CommentThread entityType="ad_idea" entityId={idea.id} />
       </div>
     </div>
   );
@@ -1117,6 +1120,8 @@ export function TrendingAdDetailSheet({
           </button>
           {generateError && <p className="mt-2 text-xs text-rose-700">{generateError}</p>}
         </section>
+
+        <CommentThread entityType="trending_ad" entityId={example.id} />
       </div>
     </div>
   );

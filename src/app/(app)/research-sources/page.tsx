@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
+import { PageLoading } from "@/components/ui/page-loading";
 
 interface Citation {
   title: string;
@@ -18,6 +19,7 @@ interface AiLog {
 export default function ResearchSourcesPage() {
   const [citations, setCitations] = useState<Citation[]>([]);
   const [logs, setLogs] = useState<AiLog[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     fetch("/api/sources")
@@ -25,6 +27,7 @@ export default function ResearchSourcesPage() {
       .then((d) => {
         setCitations(d.citations ?? []);
         setLogs(d.logs ?? []);
+        setLoading(false);
       });
   }, []);
 
@@ -43,6 +46,10 @@ export default function ResearchSourcesPage() {
         </p>
       </header>
 
+      {loading ? (
+        <PageLoading label="Loading research sources…" />
+      ) : (
+      <>
       <section>
         <h2 className="mb-4 text-sm font-semibold text-slate-700">Citations</h2>
         {citations.length === 0 ? (
@@ -84,6 +91,8 @@ export default function ResearchSourcesPage() {
           ))}
         </ul>
       </section>
+      </>
+      )}
     </div>
   );
 }

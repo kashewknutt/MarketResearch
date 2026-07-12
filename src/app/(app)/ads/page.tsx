@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
+import { PageLoading } from "@/components/ui/page-loading";
 import { Tabs } from "@/components/ui/tabs";
 import {
   AdIdeaDetailSheet,
@@ -119,6 +120,7 @@ function buildExampleColumns(
 export default function AdsPage() {
   const [tab, setTab] = useState("overview");
   const [ads, setAds] = useState<AdTrendsSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedIdea, setSelectedIdea] = useState<AdIdea | null>(null);
   const [selectedExample, setSelectedExample] = useState<TrendingAdExample | null>(null);
   const [newCompetitor, setNewCompetitor] = useState("");
@@ -133,7 +135,8 @@ export default function AdsPage() {
   const load = useCallback(() => {
     fetch("/api/ads")
       .then((r) => r.json())
-      .then((d) => setAds(d.ads));
+      .then((d) => setAds(d.ads))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -244,6 +247,15 @@ export default function AdsPage() {
         : activeIdeas.filter((i) => i.status === statusFilter),
     [activeIdeas, statusFilter],
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-slate-800">Ads & Content</h1>
+        <PageLoading label="Loading ads & content…" />
+      </div>
+    );
+  }
 
   if (!ads) {
     return (

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
+import { PageLoading } from "@/components/ui/page-loading";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
 import { LikeCell } from "@/components/like-cell";
 import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
@@ -29,6 +30,7 @@ function ProjectsPageInner() {
   const [regions, setRegions] = useState<string[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [selected, setSelected] = useState<MarketProject | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     fetch("/api/projects")
@@ -36,7 +38,8 @@ function ProjectsPageInner() {
       .then((d) => {
         setProjects(d.projects ?? []);
         setRegions(d.regions ?? []);
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -96,6 +99,15 @@ function ProjectsPageInner() {
       ] as ColumnDef<MarketProject>[],
     [likes, toggle],
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
+        <PageLoading label="Loading projects…" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

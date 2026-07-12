@@ -18,6 +18,7 @@ import {
 } from "recharts";
 import { DataTable } from "@/components/ui/data-table";
 import { MetricCard } from "@/components/ui/metric-card";
+import { PageLoading } from "@/components/ui/page-loading";
 import { formatMoney } from "@/lib/currency";
 import type {
   CompetitorSnapshot,
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [demandsByRegion, setDemandsByRegion] = useState<Record<string, DemandSignal[]>>({});
   const [projects, setProjects] = useState<MarketProject[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     fetch("/api/dashboard")
@@ -47,7 +49,8 @@ export default function DashboardPage() {
         setLeads(d.leads ?? []);
         setDemandsByRegion(d.demandsByRegion ?? {});
         setProjects(d.projects ?? []);
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -94,6 +97,10 @@ export default function DashboardPage() {
     (row: LeadRecord) => leadLikes[row.id]?.likedByMe ?? false,
     [leadLikes],
   );
+
+  if (loading) {
+    return <PageLoading label="Loading dashboard…" />;
+  }
 
   if (!profile || !metrics) {
     return <p className="text-sm text-slate-500">Loading dashboard…</p>;

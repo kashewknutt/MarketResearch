@@ -4,13 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
 import { LikeButton } from "@/components/like-button";
+import { CommentThread } from "@/components/comment-thread";
 import { EditableField } from "@/components/editable-field";
+import { PageLoading } from "@/components/ui/page-loading";
 import { currencyInputPrefix, formatMoney } from "@/lib/currency";
 import type { InvestmentSnapshot, OnboardingProfile } from "@/lib/types/domain";
 
 export default function InvestmentPlannerPage() {
   const [investment, setInvestment] = useState<InvestmentSnapshot | null>(null);
   const [profile, setProfile] = useState<OnboardingProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     fetch("/api/investment")
@@ -18,7 +21,8 @@ export default function InvestmentPlannerPage() {
       .then((d) => {
         setInvestment(d.investment);
         setProfile(d.profile ?? null);
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -54,6 +58,10 @@ export default function InvestmentPlannerPage() {
     if (d.profile) setProfile(d.profile);
   };
 
+  if (loading) {
+    return <PageLoading label="Loading investment plan…" />;
+  }
+
   if (!investment) {
     return (
       <div className="space-y-6">
@@ -86,6 +94,8 @@ export default function InvestmentPlannerPage() {
           />
         </div>
       </header>
+
+      <CommentThread entityType="investment" entityId="investment" />
 
       <div className="space-y-4">
         {investment.allocations.map((a, i) => (

@@ -8,6 +8,8 @@ import { LikeButton } from "@/components/like-button";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
 import { CampaignDetailSheet } from "@/components/campaign-detail-sheet";
+import { PageLoading } from "@/components/ui/page-loading";
+import { Tabs } from "@/components/ui/tabs";
 import type {
   AdTrendsSnapshot,
   LeadRecord,
@@ -17,6 +19,16 @@ import type {
   TrendingAdExample,
 } from "@/lib/types/domain";
 import type { Assignment, AssignmentEntityType, AssignmentStatus } from "@/lib/store/assignments";
+
+interface MentionEntry {
+  commentId: string;
+  orgId: string;
+  entityType: AssignmentEntityType;
+  entityId: string;
+  body: string;
+  createdAt: string;
+  author: { userId: string; fullName: string | null; email: string | null };
+}
 
 const STATUS_LABELS: Record<AssignmentStatus, string> = {
   assigned: "Assigned",
@@ -66,7 +78,11 @@ function findTrendingExample(ads: AdTrendsSnapshot | null, id: string): Trending
 }
 
 export default function TasksPage() {
+  const [tab, setTab] = useState("tasks");
   const [items, setItems] = useState<Assignment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mentions, setMentions] = useState<MentionEntry[]>([]);
+  const [mentionsLoading, setMentionsLoading] = useState(true);
   const [ads, setAds] = useState<AdTrendsSnapshot | null>(null);
   const [projects, setProjects] = useState<MarketProject[]>([]);
   const [leads, setLeads] = useState<LeadRecord[]>([]);
@@ -82,14 +98,28 @@ export default function TasksPage() {
   const load = useCallback(() => {
     fetch("/api/assignments")
       .then((r) => r.json())
-      .then((d) => setItems(d.assignments ?? []));
+      .then((d) => {
+        setItems(d.assignments ?? []);
+        setLoading(false);
+      });
+  }, []);
+
+  const loadMentions = useCallback(() => {
+    fetch("/api/mentions")
+      .then((r) => r.json())
+      .then((d) => {
+        setMentions(d.mentions ?? []);
+        setMentionsLoading(false);
+      });
   }, []);
 
   useEffect(() => {
     load();
-  }, [load]);
+    loadMentions();
+  }, [load, loadMentions]);
 
   useAppRefresh(load, ["all"]);
+  useAppRefresh(loadMentions, ["all"]);
 
   const updateStatus = async (id: string, status: AssignmentStatus) => {
     const res = await fetch(`/api/assignments/${id}`, {
@@ -161,58 +191,58 @@ export default function TasksPage() {
   const openLeadItem = leads.find((l) => l.id === openLeadId) ?? null;
   const openMarketingItemResolved = openMarketingId ? findMarketingItem(marketing, openMarketingId) : null;
 
-  const openAction = (item: Assignment) => {
-    if (!item.entityId) return null;
+  const openEntity = (entityType: AssignmentEntityType, entityId: string | null) => {
+    if (!entityId) return null;
 
-    if (item.entityType === "ad_idea") {
+    if (entityType === "ad_idea") {
       return (
         <button
           type="button"
-          onClick={() => openAdIdea(item.entityId!)}
+          onClick={() => openAdIdea(entityId)}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
         >
           Open
         </button>
       );
     }
-    if (item.entityType === "trending_ad") {
+    if (entityType === "trending_ad") {
       return (
         <button
           type="button"
-          onClick={() => openTrendingAd(item.entityId!)}
+          onClick={() => openTrendingAd(entityId)}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
         >
           Open
         </button>
       );
     }
-    if (item.entityType === "project") {
+    if (entityType === "project") {
       return (
         <button
           type="button"
-          onClick={() => openProject(item.entityId!)}
+          onClick={() => openProject(entityId)}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
         >
           Open
         </button>
       );
     }
-    if (item.entityType === "lead") {
+    if (entityType === "lead") {
       return (
         <button
           type="button"
-          onClick={() => openLead(item.entityId!)}
+          onClick={() => openLead(entityId)}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
         >
           Open
         </button>
       );
     }
-    if (item.entityType === "marketing" && item.entityId !== "marketing") {
+    if (entityType === "marketing" && entityId !== "marketing") {
       return (
         <button
           type="button"
-          onClick={() => openMarketingItem(item.entityId!)}
+          onClick={() => openMarketingItem(entityId)}
           className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700"
         >
           Open
@@ -222,70 +252,160 @@ export default function TasksPage() {
     return null;
   };
 
+  const openAction = (item: Assignment) => openEntity(item.entityType, item.entityId ?? null);
+
+  const mentionAction = (mention: MentionEntry) => {
+    const inline = openEntity(mention.entityType, mention.entityId);
+    if (inline) return inline;
+    const href = PAGE_LINKS[mention.entityType];
+    if (href) {
+      return (
+        <Link
+          href={href}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Open
+        </Link>
+      );
+    }
+    return null;
+  };
+
+  function formatRelativeTime(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return "just now";
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.round(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return new Date(iso).toLocaleDateString();
+  }
+
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Tasks</h1>
+        <h1 className="text-2xl font-semibold text-slate-800">For You</h1>
         <p className="mt-1 text-sm text-slate-500">
           Work assigned to you across the workspace.
         </p>
       </header>
 
-      {items.length === 0 && (
-        <p className="rounded-xl border border-slate-100 bg-white p-6 text-sm text-slate-500">
-          Nothing assigned to you yet.
-        </p>
+      <Tabs
+        tabs={[
+          { id: "tasks", label: "Tasks" },
+          { id: "mentioned", label: "Mentioned" },
+        ]}
+        active={tab}
+        onChange={setTab}
+      />
+
+      {tab === "tasks" && (
+        loading ? (
+          <PageLoading label="Loading your tasks…" />
+        ) : (
+          <>
+            {items.length === 0 && (
+              <p className="rounded-xl border border-slate-100 bg-white p-6 text-sm text-slate-500">
+                Nothing assigned to you yet.
+              </p>
+            )}
+
+            <div className="space-y-3">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-white p-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
+                        {ENTITY_LABELS[item.entityType]}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+                        {STATUS_LABELS[item.status]}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-sm font-medium text-slate-800">{item.title}</p>
+                    {item.notes && (
+                      <p className="mt-0.5 text-xs text-slate-500">{item.notes}</p>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    <LikeButton entityType="task" entityId={item.id} />
+                    <select
+                      value={item.status}
+                      onChange={(e) =>
+                        updateStatus(item.id, e.target.value as AssignmentStatus)
+                      }
+                      className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
+                    >
+                      <option value="assigned">Assigned</option>
+                      <option value="in_progress">In progress</option>
+                      <option value="done">Done</option>
+                    </select>
+
+                    {openAction(item)}
+
+                    {PAGE_LINKS[item.entityType] && (
+                      <Link
+                        href={PAGE_LINKS[item.entityType]!}
+                        className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        Open page
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )
       )}
 
-      <div className="space-y-3">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-white p-4"
-          >
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
-                  {ENTITY_LABELS[item.entityType]}
-                </span>
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-                  {STATUS_LABELS[item.status]}
-                </span>
-              </div>
-              <p className="mt-1.5 text-sm font-medium text-slate-800">{item.title}</p>
-              {item.notes && (
-                <p className="mt-0.5 text-xs text-slate-500">{item.notes}</p>
-              )}
-            </div>
+      {tab === "mentioned" && (
+        mentionsLoading ? (
+          <PageLoading label="Loading mentions…" />
+        ) : (
+          <>
+            {mentions.length === 0 && (
+              <p className="rounded-xl border border-slate-100 bg-white p-6 text-sm text-slate-500">
+                No one has mentioned you yet.
+              </p>
+            )}
 
-            <div className="flex shrink-0 items-center gap-2">
-              <LikeButton entityType="task" entityId={item.id} />
-              <select
-                value={item.status}
-                onChange={(e) =>
-                  updateStatus(item.id, e.target.value as AssignmentStatus)
-                }
-                className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs"
-              >
-                <option value="assigned">Assigned</option>
-                <option value="in_progress">In progress</option>
-                <option value="done">Done</option>
-              </select>
-
-              {openAction(item)}
-
-              {PAGE_LINKS[item.entityType] && (
-                <Link
-                  href={PAGE_LINKS[item.entityType]!}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            <div className="space-y-3">
+              {mentions.map((mention) => (
+                <div
+                  key={mention.commentId}
+                  className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-white p-4"
                 >
-                  Open page
-                </Link>
-              )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
+                        {ENTITY_LABELS[mention.entityType]}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {formatRelativeTime(mention.createdAt)}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 text-sm font-medium text-slate-800">{mention.body}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {mention.author.fullName ?? mention.author.email ?? "Unknown"}
+                    </p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-2">
+                    {mentionAction(mention)}
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        ))}
-      </div>
+          </>
+        )
+      )}
 
       <AdIdeaDetailSheet
         idea={openIdea}

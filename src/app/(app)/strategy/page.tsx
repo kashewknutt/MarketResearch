@@ -4,18 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
 import { LikeButton } from "@/components/like-button";
+import { CommentThread } from "@/components/comment-thread";
 import { EditableField } from "@/components/editable-field";
 import { ProjectCard } from "@/components/project-card";
+import { PageLoading } from "@/components/ui/page-loading";
 import type { MarketProject, StrategySnapshot } from "@/lib/types/domain";
 
 export default function StrategyPage() {
   const [strategy, setStrategy] = useState<StrategySnapshot | null>(null);
   const [projects, setProjects] = useState<MarketProject[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(() => {
     fetch("/api/strategy")
       .then((r) => r.json())
-      .then((d) => setStrategy(d.strategy));
+      .then((d) => setStrategy(d.strategy))
+      .finally(() => setLoading(false));
     fetch("/api/projects")
       .then((r) => r.json())
       .then((d) => setProjects(d.projects ?? []));
@@ -37,6 +41,10 @@ export default function StrategyPage() {
     const d = await res.json();
     setStrategy(d.strategy);
   };
+
+  if (loading) {
+    return <PageLoading label="Loading strategy…" />;
+  }
 
   if (!strategy) {
     return (
@@ -65,6 +73,8 @@ export default function StrategyPage() {
           />
         </div>
       </header>
+
+      <CommentThread entityType="strategy" entityId="strategy" />
 
       <EditableField
         label="Ideal customer profile"

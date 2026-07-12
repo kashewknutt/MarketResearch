@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { PageLoading } from "@/components/ui/page-loading";
 
 interface OrgMember {
   userId: string;
@@ -63,7 +64,7 @@ export default function TeamPage() {
   };
 
   if (!data) {
-    return <p className="text-sm text-slate-500">Loading team…</p>;
+    return <PageLoading label="Loading team…" />;
   }
 
   return (

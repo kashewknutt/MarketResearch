@@ -7,11 +7,28 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
 import { LikeCell } from "@/components/like-cell";
+import { PageLoading } from "@/components/ui/page-loading";
 import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
 import type { LeadRecord } from "@/lib/types/domain";
 import type { ColumnDef } from "@tanstack/react-table";
 
 const col = createColumnHelper<LeadRecord>();
+
+const OUTREACH_LABELS: Record<NonNullable<LeadRecord["outreachStatus"]>, string> = {
+  none: "Not started",
+  contact_found: "Contact found",
+  drafted: "Drafted",
+  sent: "Sent",
+};
+
+function OutreachBadge({ status }: { status: LeadRecord["outreachStatus"] }) {
+  const key = status ?? "none";
+  return (
+    <span className="inline-block rounded-full bg-slate-50 px-2 py-0.5 text-xs text-slate-600">
+      {OUTREACH_LABELS[key]}
+    </span>
+  );
+}
 
 export default function LeadsPage() {
   return (
@@ -26,10 +43,12 @@ function LeadsPageInner() {
   const focusId = searchParams.get("focus");
   const [leads, setLeads] = useState<LeadRecord[]>([]);
   const [selected, setSelected] = useState<LeadRecord | null>(null);
+  const [loading, setLoading] = useState(true);
   const load = useCallback(() => {
     fetch("/api/leads")
       .then((r) => r.json())
-      .then((d) => setLeads(d.leads ?? []));
+      .then((d) => setLeads(d.leads ?? []))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -64,6 +83,11 @@ function LeadsPageInner() {
         col.accessor("fitScore", { header: "Fit score" }),
         col.accessor("status", { header: "Status" }),
         col.display({
+          id: "outreach",
+          header: "Outreach",
+          cell: ({ row }) => <OutreachBadge status={row.original.outreachStatus} />,
+        }),
+        col.display({
           id: "sources",
           header: "Sources",
           cell: ({ row }) => row.original.sources.length,
@@ -84,16 +108,22 @@ function LeadsPageInner() {
         </p>
       </header>
 
-      {leads.length === 0 && (
-        <p className="text-sm text-slate-500">Run research or refresh to discover leads.</p>
-      )}
+      {loading ? (
+        <PageLoading label="Loading leads…" />
+      ) : (
+        <>
+          {leads.length === 0 && (
+            <p className="text-sm text-slate-500">Run research or refresh to discover leads.</p>
+          )}
 
-      <DataTable
-        data={leads}
-        columns={columns}
-        onRowClick={(row) => setSelected(row)}
-        isLiked={isLiked}
-      />
+          <DataTable
+            data={leads}
+            columns={columns}
+            onRowClick={(row) => setSelected(row)}
+            isLiked={isLiked}
+          />
+        </>
+      )}
 
       <LeadDetailSheet
         lead={selected}

@@ -4,12 +4,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { AssignTaskButton } from "@/components/assign-task-button";
 import { LikeButton } from "@/components/like-button";
+import { CommentThread } from "@/components/comment-thread";
 import { FinancialMetricGrid } from "@/components/financial-metric-grid";
 import {
   FinancialInflowOutflowChart,
   FinancialMrrChart,
 } from "@/components/financial-projection-chart";
 import { MetricCard } from "@/components/ui/metric-card";
+import { PageLoading } from "@/components/ui/page-loading";
 import { formatMoney } from "@/lib/currency";
 import { computePlBothScenarios } from "@/lib/research/financial-pl-engine";
 import { buildProjections } from "@/lib/research/projection-engine";
@@ -29,6 +31,7 @@ export default function FinancialAnalysisPage() {
     null,
   );
   const [editTab, setEditTab] = useState<FinancialScenario>("ambitious");
+  const [loading, setLoading] = useState(true);
 
   const loadFinancial = useCallback(() => {
     fetch("/api/financial")
@@ -43,7 +46,8 @@ export default function FinancialAnalysisPage() {
           setMetricWorkbook(d.financial.metricWorkbook);
           setEditTab(d.financial.metricWorkbook.activeScenario);
         }
-      });
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -95,6 +99,10 @@ export default function FinancialAnalysisPage() {
     if (d.financial?.metricWorkbook) setMetricWorkbook(d.financial.metricWorkbook);
   };
 
+  if (loading) {
+    return <PageLoading label="Loading financial analysis…" />;
+  }
+
   if (!financial || !profile || !financial.metricWorkbook) {
     return (
       <div className="space-y-6">
@@ -138,6 +146,8 @@ export default function FinancialAnalysisPage() {
           />
         </div>
       </header>
+
+      <CommentThread entityType="financial" entityId="financial" />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
