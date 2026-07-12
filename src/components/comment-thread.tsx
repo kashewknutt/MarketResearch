@@ -45,6 +45,12 @@ interface PickerPosition {
   top: number;
 }
 
+interface ComposerPiece {
+  text: string;
+  mention: boolean;
+  isCaret?: boolean;
+}
+
 function displayName(person: { fullName?: string | null; email?: string | null; userId?: string }): string {
   return person.fullName ?? person.email ?? person.userId ?? "Unknown";
 }
@@ -91,6 +97,40 @@ function buildMentionSegments(body: string, mentionLabels: string[]): MentionSeg
   }));
 }
 
+function buildComposerPieces(segments: MentionSegment[], caret: number): ComposerPiece[] {
+  const pieces: ComposerPiece[] = [];
+  let offset = 0;
+
+  for (const segment of segments) {
+    const segmentStart = offset;
+    const segmentEnd = offset + segment.text.length;
+
+    if (caret >= segmentStart && caret <= segmentEnd) {
+      const splitIndex = caret - segmentStart;
+      const before = segment.text.slice(0, splitIndex);
+      const after = segment.text.slice(splitIndex);
+
+      if (before) {
+        pieces.push({ text: before, mention: segment.mention });
+      }
+      pieces.push({ text: "", mention: false, isCaret: true });
+      if (after) {
+        pieces.push({ text: after, mention: segment.mention });
+      }
+    } else {
+      pieces.push({ text: segment.text, mention: segment.mention });
+    }
+
+    offset = segmentEnd;
+  }
+
+  if (pieces.every((piece) => !piece.isCaret)) {
+    pieces.push({ text: "", mention: false, isCaret: true });
+  }
+
+  return pieces;
+}
+
 function renderBody(body: string, mentionedUserIds: string[], members: OrgMemberOption[]) {
   if (mentionedUserIds.length === 0) return body;
   const namesByUserId = new Map(members.map((m) => [m.userId, displayName(m)]));
@@ -123,6 +163,7 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
   const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
   const [caretIndex, setCaretIndex] = useState(0);
   const [pickerPosition, setPickerPosition] = useState<PickerPosition>({ left: 12, top: 36 });
+  const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -171,6 +212,11 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
   const composerSegments = useMemo(
     () => buildMentionSegments(text, composerMentionLabels),
     [composerMentionLabels, text],
+  );
+
+  const composerPieces = useMemo(
+    () => buildComposerPieces(composerSegments, caretIndex),
+    [caretIndex, composerSegments],
   );
 
   useLayoutEffect(() => {
@@ -295,32 +341,31 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
             className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2 text-sm leading-5 text-slate-600"
           >
             {text ? (
-              composerSegments.map((segment, index) => (
-                <span
-                  key={`${segment.text}-${index}`}
-                  className={
-                    segment.mention
-                      ? "rounded bg-violet-100 px-1 py-0.5 font-medium text-violet-700"
-                      : undefined
-                  }
-                >
-                  {segment.text}
-                </span>
-              ))
+              composerPieces.map((piece, index) =>
+                piece.isCaret ? (
+                  <span
+                    key={`caret-${index}`}
+                    ref={markerRef}
+                    className={`inline-block h-5 w-px align-bottom ${
+                      isComposerFocused ? "bg-slate-700" : "bg-transparent"
+                    }`}
+                  />
+                ) : (
+                  <span
+                    key={`${piece.text}-${index}`}
+                    className={
+                      piece.mention
+                        ? "rounded bg-violet-100 px-1 py-0.5 font-medium text-violet-700"
+                        : undefined
+                    }
+                  >
+                    {piece.text}
+                  </span>
+                ),
+              )
             ) : (
               <span className="text-slate-400">Add a comment… type @ to mention someone</span>
             )}
-          </div>
-
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2 text-sm leading-5 opacity-0"
-          >
-            {text.slice(0, caretIndex)}
-            <span ref={markerRef} className="inline-block h-5 w-px align-bottom">
-              |
-            </span>
-            {text.slice(caretIndex) || " "}
           </div>
 
           <textarea
@@ -328,12 +373,14 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
             value={text}
             onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
             onClick={syncSelection}
+            onFocus={() => setIsComposerFocused(true)}
+            onBlur={() => setIsComposerFocused(false)}
             onKeyUp={syncSelection}
             onSelect={syncSelection}
             onScroll={syncScroll}
             placeholder="Add a comment… type @ to mention someone"
             rows={3}
-            className="relative z-10 min-h-[76px] w-full resize-y rounded-lg bg-transparent px-3 py-2 text-sm leading-5 text-transparent caret-slate-700 outline-none placeholder:text-transparent"
+            className="relative z-10 min-h-[76px] w-full resize-y rounded-lg bg-transparent px-3 py-2 text-sm leading-5 text-transparent caret-transparent outline-none placeholder:text-transparent"
           />
         </div>
 
