@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useOrgMembers, type OrgMemberOption } from "@/lib/hooks/use-org-members";
 import type { AssignmentEntityType } from "@/lib/store/assignments";
 
@@ -35,6 +35,16 @@ interface SelectedMention {
   label: string;
 }
 
+interface MentionSegment {
+  text: string;
+  mention: boolean;
+}
+
+interface PickerPosition {
+  left: number;
+  top: number;
+}
+
 function displayName(person: { fullName?: string | null; email?: string | null; userId?: string }): string {
   return person.fullName ?? person.email ?? person.userId ?? "Unknown";
 }
@@ -64,6 +74,23 @@ function getActiveMention(value: string, caret: number): ActiveMention | null {
   return { start: atIndex, end: caret, query };
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildMentionSegments(body: string, mentionLabels: string[]): MentionSegment[] {
+  if (mentionLabels.length === 0) return [{ text: body, mention: false }];
+
+  const pattern = new RegExp(`(@(?:${mentionLabels.map(escapeRegExp).join("|")}))`, "g");
+  const rawParts = body.split(pattern).filter((part) => part.length > 0);
+  if (rawParts.length === 0) return [{ text: "", mention: false }];
+
+  return rawParts.map((part) => ({
+    text: part,
+    mention: mentionLabels.some((label) => part === `@${label}`),
+  }));
+}
+
 function renderBody(body: string, mentionedUserIds: string[], members: OrgMemberOption[]) {
   if (mentionedUserIds.length === 0) return body;
   const namesByUserId = new Map(members.map((m) => [m.userId, displayName(m)]));
@@ -73,17 +100,18 @@ function renderBody(body: string, mentionedUserIds: string[], members: OrgMember
 
   if (mentionedNames.length === 0) return body;
 
-  const pattern = new RegExp(`(@(?:${mentionedNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")}))`, "g");
-  const parts = body.split(pattern);
-  return parts.map((part, i) =>
-    mentionedNames.some((n) => part === `@${n}`) ? (
-      <span key={i} className="font-medium text-violet-700">
-        {part}
-      </span>
-    ) : (
-      <span key={i}>{part}</span>
-    ),
-  );
+  return buildMentionSegments(body, mentionedNames).map((segment, i) => (
+    <span
+      key={`${segment.text}-${i}`}
+      className={
+        segment.mention
+          ? "rounded bg-violet-100 px-1 py-0.5 font-medium text-violet-700"
+          : undefined
+      }
+    >
+      {segment.text}
+    </span>
+  ));
 }
 
 export function CommentThread({ entityType, entityId, className }: CommentThreadProps) {
@@ -93,9 +121,14 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
   const [text, setText] = useState("");
   const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
   const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
+  const [caretIndex, setCaretIndex] = useState(0);
+  const [pickerPosition, setPickerPosition] = useState<PickerPosition>({ left: 12, top: 36 });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const markerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -127,9 +160,52 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
     });
   }, [activeMention?.query, members, selectedMentions]);
 
+  const composerMentionLabels = useMemo(
+    () =>
+      selectedMentions
+        .filter((mention) => text.includes(`@${mention.label}`))
+        .map((mention) => mention.label),
+    [selectedMentions, text],
+  );
+
+  const composerSegments = useMemo(
+    () => buildMentionSegments(text, composerMentionLabels),
+    [composerMentionLabels, text],
+  );
+
+  useLayoutEffect(() => {
+    if (!activeMention || !editorRef.current || !markerRef.current || !textareaRef.current) return;
+
+    const marker = markerRef.current;
+    const textarea = textareaRef.current;
+    const editor = editorRef.current;
+    const nextLeft = marker.offsetLeft - textarea.scrollLeft;
+    const nextTop = marker.offsetTop - textarea.scrollTop + 24;
+    const maxLeft = Math.max(12, editor.clientWidth - 272);
+
+    setPickerPosition({
+      left: Math.min(Math.max(12, nextLeft), maxLeft),
+      top: Math.max(40, nextTop),
+    });
+  }, [activeMention, caretIndex, text]);
+
+  function syncScroll() {
+    if (!textareaRef.current || !overlayRef.current) return;
+    overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+    overlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
+  }
+
+  function syncSelection() {
+    if (!textareaRef.current) return;
+    const nextCaret = textareaRef.current.selectionStart ?? text.length;
+    setCaretIndex(nextCaret);
+    setActiveMention(getActiveMention(textareaRef.current.value, nextCaret));
+  }
+
   function handleTextChange(value: string, caret: number) {
     setText(value);
     setSelectedMentions((prev) => prev.filter((mention) => value.includes(`@${mention.label}`)));
+    setCaretIndex(caret);
     setActiveMention(getActiveMention(value, caret));
   }
 
@@ -144,11 +220,13 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
     setSelectedMentions((prev) =>
       prev.some((mention) => mention.userId === member.userId) ? prev : [...prev, { userId: member.userId, label }],
     );
+    setCaretIndex(nextCaretPosition);
     setActiveMention(null);
 
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
       textareaRef.current?.setSelectionRange(nextCaretPosition, nextCaretPosition);
+      syncScroll();
     });
   }
 
@@ -176,6 +254,7 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
       setComments((prev) => [...prev, comment]);
       setText("");
       setSelectedMentions([]);
+      setCaretIndex(0);
       setActiveMention(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not post comment");
@@ -209,25 +288,70 @@ export function CommentThread({ entityType, entityId, className }: CommentThread
       </div>
 
       <div className="relative mt-3">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
-          placeholder="Add a comment… type @ to mention someone"
-          rows={2}
-          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-        />
+        <div ref={editorRef} className="relative rounded-lg border border-slate-200 bg-white">
+          <div
+            ref={overlayRef}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2 text-sm leading-5 text-slate-600"
+          >
+            {text ? (
+              composerSegments.map((segment, index) => (
+                <span
+                  key={`${segment.text}-${index}`}
+                  className={
+                    segment.mention
+                      ? "rounded bg-violet-100 px-1 py-0.5 font-medium text-violet-700"
+                      : undefined
+                  }
+                >
+                  {segment.text}
+                </span>
+              ))
+            ) : (
+              <span className="text-slate-400">Add a comment… type @ to mention someone</span>
+            )}
+          </div>
+
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words px-3 py-2 text-sm leading-5 opacity-0"
+          >
+            {text.slice(0, caretIndex)}
+            <span ref={markerRef} className="inline-block h-5 w-px align-bottom">
+              |
+            </span>
+            {text.slice(caretIndex) || " "}
+          </div>
+
+          <textarea
+            ref={textareaRef}
+            value={text}
+            onChange={(e) => handleTextChange(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+            onClick={syncSelection}
+            onKeyUp={syncSelection}
+            onSelect={syncSelection}
+            onScroll={syncScroll}
+            placeholder="Add a comment… type @ to mention someone"
+            rows={3}
+            className="relative z-10 min-h-[76px] w-full resize-y rounded-lg bg-transparent px-3 py-2 text-sm leading-5 text-transparent caret-slate-700 outline-none placeholder:text-transparent"
+          />
+        </div>
 
         {activeMention && availableMembers.length > 0 && (
-          <div className="absolute left-0 top-full z-20 mt-1 w-64 rounded-lg border border-slate-100 bg-white p-1 shadow-lg">
+          <div
+            className="absolute z-20 mt-1 w-64 rounded-lg border border-slate-100 bg-white p-1 shadow-lg"
+            style={{ left: pickerPosition.left, top: pickerPosition.top }}
+          >
             {availableMembers.map((m) => (
               <button
                 key={m.userId}
                 type="button"
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => pickMention(m)}
                 className="block w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-600 hover:bg-violet-50"
               >
-                {displayName(m)}
+                <span className="font-medium text-slate-700">{displayName(m)}</span>
+                {m.email && <span className="ml-1 text-slate-400">{m.email}</span>}
               </button>
             ))}
           </div>
