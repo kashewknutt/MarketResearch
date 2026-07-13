@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getCurrentOrg, getCurrentUserId } from "@/lib/auth/session";
 import { createComment, getComments, type CommentEntityType } from "@/lib/store/comments";
 import { ASSIGNMENT_ENTITY_TYPES } from "@/lib/store/assignments";
+import { notifyMentionedUsers } from "@/lib/email/notify-mentions";
 
 function isValidEntityType(value: unknown): value is CommentEntityType {
   return typeof value === "string" && (ASSIGNMENT_ENTITY_TYPES as readonly string[]).includes(value);
@@ -40,6 +41,17 @@ export async function POST(request: Request) {
   const { orgId } = await getCurrentOrg();
   const userId = await getCurrentUserId();
   const comment = await createComment(orgId, entityType, entityId, userId, commentBody, mentionedUserIds);
+
+  after(async () => {
+    await notifyMentionedUsers({
+      orgId,
+      entityType,
+      commentBody,
+      authorUserId: userId,
+      authorName: comment.author.fullName ?? comment.author.email ?? "Someone",
+      mentionedUserIds: comment.mentionedUserIds,
+    });
+  });
 
   return NextResponse.json({ comment });
 }

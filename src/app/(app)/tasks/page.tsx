@@ -18,6 +18,7 @@ import type {
   MarketProject,
   TrendingAdExample,
 } from "@/lib/types/domain";
+import { ENTITY_LABELS } from "@/lib/store/assignments";
 import type { Assignment, AssignmentEntityType, AssignmentStatus } from "@/lib/store/assignments";
 
 interface MentionEntry {
@@ -34,18 +35,6 @@ const STATUS_LABELS: Record<AssignmentStatus, string> = {
   assigned: "Assigned",
   in_progress: "In progress",
   done: "Done",
-};
-
-const ENTITY_LABELS: Record<AssignmentEntityType, string> = {
-  ad_idea: "Ad idea",
-  trending_ad: "Trending ad",
-  project: "Project",
-  lead: "Lead",
-  financial: "Financial",
-  marketing: "Marketing",
-  strategy: "Strategy",
-  investment: "Investment",
-  freeform: "Task",
 };
 
 const PAGE_LINKS: Partial<Record<AssignmentEntityType, string>> = {

@@ -17,6 +17,18 @@ export const ASSIGNMENT_ENTITY_TYPES = [
 
 export type AssignmentEntityType = (typeof ASSIGNMENT_ENTITY_TYPES)[number];
 
+export const ENTITY_LABELS: Record<AssignmentEntityType, string> = {
+  ad_idea: "Ad idea",
+  trending_ad: "Trending ad",
+  project: "Project",
+  lead: "Lead",
+  financial: "Financial",
+  marketing: "Marketing",
+  strategy: "Strategy",
+  investment: "Investment",
+  freeform: "Task",
+};
+
 export const ASSIGNMENT_STATUSES = ["assigned", "in_progress", "done"] as const;
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
 
