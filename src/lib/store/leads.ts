@@ -53,6 +53,22 @@ export async function getLeadsByRegion(region: string): Promise<LeadRecord[]> {
   return all.filter((l) => l.region === region);
 }
 
+export interface LeadsPage {
+  leads: LeadRecord[];
+  total: number;
+}
+
+/** Same fitScore-desc ordering as getAllLeads, sliced for incremental loading. */
+export async function getLeadsPage(offset: number, limit: number): Promise<LeadsPage> {
+  const all = await getAllLeads();
+  return { leads: all.slice(offset, offset + limit), total: all.length };
+}
+
+export async function getLeadById(id: string): Promise<LeadRecord | null> {
+  const all = await getAllLeads();
+  return all.find((l) => l.id === id) ?? null;
+}
+
 export function newLeadId(): string {
   return randomUUID();
 }

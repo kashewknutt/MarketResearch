@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { getProfile } from "@/lib/store/settings";
-import { getAllLeads } from "@/lib/store/leads";
+import { getLeadsPage } from "@/lib/store/leads";
 import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
 import { randomUUID } from "crypto";
 
-export async function GET() {
-  const leads = await getAllLeads();
-  return NextResponse.json({ leads });
+const DEFAULT_PAGE_SIZE = 30;
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const offset = Math.max(0, Number(searchParams.get("offset") ?? 0) || 0);
+  const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE));
+
+  const { leads, total } = await getLeadsPage(offset, limit);
+  return NextResponse.json({ leads, total, offset, limit });
 }
 
 export async function POST() {

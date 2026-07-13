@@ -38,18 +38,38 @@ export default function LeadsPage() {
   );
 }
 
+const PAGE_SIZE = 30;
+
 function LeadsPageInner() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
   const [leads, setLeads] = useState<LeadRecord[]>([]);
+  const [total, setTotal] = useState(0);
   const [selected, setSelected] = useState<LeadRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const load = useCallback(() => {
-    fetch("/api/leads")
+    setLoading(true);
+    fetch(`/api/leads?offset=0&limit=${PAGE_SIZE}`)
       .then((r) => r.json())
-      .then((d) => setLeads(d.leads ?? []))
+      .then((d) => {
+        setLeads(d.leads ?? []);
+        setTotal(d.total ?? 0);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  const loadMore = useCallback(() => {
+    setLoadingMore(true);
+    fetch(`/api/leads?offset=${leads.length}&limit=${PAGE_SIZE}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setLeads((prev) => [...prev, ...(d.leads ?? [])]);
+        setTotal(d.total ?? 0);
+      })
+      .finally(() => setLoadingMore(false));
+  }, [leads.length]);
 
   useEffect(() => {
     load();
@@ -58,9 +78,17 @@ function LeadsPageInner() {
   useAppRefresh(load, ["leads", "all"]);
 
   useEffect(() => {
-    if (!focusId || leads.length === 0) return;
-    const match = leads.find((l) => l.id === focusId);
-    if (match) setSelected(match);
+    if (!focusId) return;
+    const alreadyLoaded = leads.find((l) => l.id === focusId);
+    if (alreadyLoaded) {
+      setSelected(alreadyLoaded);
+      return;
+    }
+    fetch(`/api/leads/${focusId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.lead) setSelected(d.lead);
+      });
   }, [focusId, leads]);
 
   const { likes, toggle, refresh } = useLikeSummaries(
@@ -122,6 +150,19 @@ function LeadsPageInner() {
             onRowClick={(row) => setSelected(row)}
             isLiked={isLiked}
           />
+
+          {leads.length < total && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-1.5 text-xs font-medium text-violet-800 hover:bg-violet-100 disabled:opacity-50"
+              >
+                {loadingMore ? "Loading…" : `Load more (${leads.length} of ${total})`}
+              </button>
+            </div>
+          )}
         </>
       )}
 
