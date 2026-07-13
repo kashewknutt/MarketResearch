@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
@@ -25,13 +26,22 @@ export function Sidebar({ businessName }: { businessName?: string }) {
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-slate-100 bg-[#faf9fc] px-3 py-6">
-      <div className="mb-8 px-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-          Northstar
-        </p>
-        <h1 className="mt-1 text-sm font-semibold text-slate-800">
-          {businessName ?? "Your Business"}
-        </h1>
+      <div className="mb-8 flex items-center gap-2.5 px-2">
+        <Image
+          src="/northstar-logo.png"
+          alt="Northstar logo"
+          width={32}
+          height={32}
+          className="rounded-md"
+        />
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            Northstar
+          </p>
+          <h1 className="mt-1 text-sm font-semibold text-slate-800">
+            {businessName ?? "Your Business"}
+          </h1>
+        </div>
       </div>
       <nav className="flex flex-1 flex-col gap-0.5">
         {NAV.map((item) => {

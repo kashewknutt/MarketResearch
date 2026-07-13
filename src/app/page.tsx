@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -72,7 +73,15 @@ function LandingNav() {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-100 bg-white/70 backdrop-blur">
       <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-        <span className="text-sm font-semibold uppercase tracking-wide text-violet-700">
+        <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-violet-700">
+          <Image
+            src="/northstar-logo.png"
+            alt="Northstar logo"
+            width={28}
+            height={28}
+            className="rounded-md"
+            priority
+          />
           Northstar
         </span>
         <div className="hidden items-center gap-8 text-sm text-slate-500 sm:flex">
@@ -106,7 +115,15 @@ function LandingPage() {
         />
 
         <div className="relative w-full max-w-2xl text-center">
-          <span className="inline-flex items-center rounded-full bg-violet-100 px-4 py-1.5 text-xs font-medium uppercase tracking-wide text-violet-700">
+          <Image
+            src="/northstar-logo.png"
+            alt="Northstar logo"
+            width={72}
+            height={72}
+            className="mx-auto rounded-2xl shadow-sm"
+            priority
+          />
+          <span className="mt-6 inline-flex items-center rounded-full bg-violet-100 px-4 py-1.5 text-xs font-medium uppercase tracking-wide text-violet-700">
             Northstar
           </span>
 

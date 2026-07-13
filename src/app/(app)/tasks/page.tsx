@@ -18,7 +18,7 @@ import type {
   MarketProject,
   TrendingAdExample,
 } from "@/lib/types/domain";
-import { ENTITY_LABELS } from "@/lib/store/assignments";
+import { ENTITY_LABELS } from "@/lib/store/entity-types";
 import type { Assignment, AssignmentEntityType, AssignmentStatus } from "@/lib/store/assignments";
 
 interface MentionEntry {

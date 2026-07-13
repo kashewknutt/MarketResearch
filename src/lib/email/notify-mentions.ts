@@ -1,4 +1,4 @@
-import { ENTITY_LABELS, type AssignmentEntityType } from "@/lib/store/assignments";
+import { ENTITY_LABELS, type AssignmentEntityType } from "@/lib/store/entity-types";
 import { getProfilesByIds } from "@/lib/store/profiles";
 import { sendMentionEmail } from "@/lib/email/mention-email";
 

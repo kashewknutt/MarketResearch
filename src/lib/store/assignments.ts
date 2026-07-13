@@ -3,31 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { assignments, orgMembers } from "@/lib/db/schema";
 
-export const ASSIGNMENT_ENTITY_TYPES = [
-  "ad_idea",
-  "trending_ad",
-  "project",
-  "lead",
-  "financial",
-  "marketing",
-  "strategy",
-  "investment",
-  "freeform",
-] as const;
-
-export type AssignmentEntityType = (typeof ASSIGNMENT_ENTITY_TYPES)[number];
-
-export const ENTITY_LABELS: Record<AssignmentEntityType, string> = {
-  ad_idea: "Ad idea",
-  trending_ad: "Trending ad",
-  project: "Project",
-  lead: "Lead",
-  financial: "Financial",
-  marketing: "Marketing",
-  strategy: "Strategy",
-  investment: "Investment",
-  freeform: "Task",
-};
+export { ASSIGNMENT_ENTITY_TYPES, ENTITY_LABELS } from "@/lib/store/entity-types";
+export type { AssignmentEntityType } from "@/lib/store/entity-types";
+import type { AssignmentEntityType } from "@/lib/store/entity-types";
 
 export const ASSIGNMENT_STATUSES = ["assigned", "in_progress", "done"] as const;
 export type AssignmentStatus = (typeof ASSIGNMENT_STATUSES)[number];
