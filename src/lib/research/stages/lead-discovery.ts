@@ -4,11 +4,12 @@ import { createProvenance } from "@/lib/db/provenance";
 import { leadSchema, safeParse } from "@/lib/agents/validate";
 import { linkedInCompanyUrlFromProfile } from "@/lib/integrations/linkedin";
 import type { LeadRecord, OnboardingProfile, RegionCode } from "@/lib/types/domain";
-import { getAllLeads, newLeadId, saveLeads } from "@/lib/store/leads";
-
-function normalizeCompanyName(name: string): string {
-  return name.trim().toLowerCase();
-}
+import {
+  getAllLeads,
+  newLeadId,
+  normalizeCompanyName,
+  saveLeads,
+} from "@/lib/store/leads";
 
 export async function runLeadDiscovery(
   profile: OnboardingProfile,
@@ -71,6 +72,7 @@ Return JSON: { "leads": [{ "company": string, "region": "${region}", "fitScore":
         status: "new",
         provenance: createProvenance("search", result.citations, 0.75),
         createdAt: new Date().toISOString(),
+        source: "discovery",
       });
     }
   }

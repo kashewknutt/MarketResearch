@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -16,7 +17,13 @@ import { LikeButton } from "@/components/like-button";
 import { EditableField } from "@/components/editable-field";
 import { CitationList } from "@/components/ui/citation-list";
 import { formatMoney } from "@/lib/currency";
-import type { MarketProject, PrecedentRecord } from "@/lib/types/domain";
+import {
+  PROJECT_LEAD_CATEGORY_COLORS,
+  PROJECT_LEAD_CATEGORY_LABELS,
+  PROJECT_LEAD_PROGRESS_STAGES,
+  type ProjectLeadProgressStage,
+} from "@/lib/project-lead-labels";
+import type { LeadRecord, MarketProject, PrecedentRecord } from "@/lib/types/domain";
 
 function parsePrecedentMetric(metric?: string): number | null {
   if (!metric) return null;
@@ -33,6 +40,48 @@ function precedentChartRows(precedents: PrecedentRecord[]) {
   }));
 }
 
+function ProjectLeadProgressPanel({
+  progress,
+  message,
+  stages,
+}: {
+  progress: number;
+  message: string;
+  stages: ProjectLeadProgressStage[];
+}) {
+  return (
+    <div className="mt-3 rounded-lg border border-violet-100 bg-white p-3">
+      <p className="text-xs font-medium text-slate-800">Generating leads…</p>
+      <p className="mt-1 text-xs text-slate-600">{message}</p>
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full rounded-full bg-violet-500 transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <p className="mt-1 text-xs text-slate-400">{progress}% complete</p>
+      <ul className="mt-3 space-y-2">
+        {stages.map((stage) => (
+          <li key={stage.id} className="flex items-center gap-2 text-xs">
+            <span
+              className={`h-2 w-2 shrink-0 rounded-full ${
+                stage.status === "completed"
+                  ? "bg-emerald-400"
+                  : stage.status === "running"
+                    ? "animate-pulse bg-violet-400"
+                    : stage.status === "failed"
+                      ? "bg-rose-400"
+                      : "bg-slate-200"
+              }`}
+            />
+            <span className="text-slate-700">{stage.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 interface ProjectDetailSheetProps {
   project: MarketProject | null;
   onClose: () => void;
@@ -44,12 +93,38 @@ export function ProjectDetailSheet({
   onClose,
   onUpdated,
 }: ProjectDetailSheetProps) {
+  const router = useRouter();
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [doneError, setDoneError] = useState<string | null>(null);
   const [chartMounted, setChartMounted] = useState(false);
+  const [generatingLeads, setGeneratingLeads] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generateNotice, setGenerateNotice] = useState<string | null>(null);
+  const [linkedLeads, setLinkedLeads] = useState<LeadRecord[]>([]);
+  const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
+  const [copiedMessageKey, setCopiedMessageKey] = useState<string | null>(null);
+  const [leadProgress, setLeadProgress] = useState<{
+    progress: number;
+    message: string;
+    stages: ProjectLeadProgressStage[];
+  } | null>(null);
+  const [showViewLeads, setShowViewLeads] = useState(false);
 
   useEffect(() => setChartMounted(true), []);
+
+  const leadIds = project?.projectLeadContext?.leadIds ?? [];
+
+  useEffect(() => {
+    if (!project || leadIds.length === 0) {
+      setLinkedLeads([]);
+      return;
+    }
+    fetch(`/api/leads?ids=${leadIds.join(",")}`)
+      .then((r) => r.json())
+      .then((d) => setLinkedLeads(d.leads ?? []))
+      .catch(() => setLinkedLeads([]));
+  }, [project?.id, leadIds.join(",")]);
 
   const precedentChart = useMemo(
     () => (project?.precedents?.length ? precedentChartRows(project.precedents) : []),
@@ -89,6 +164,122 @@ export function ProjectDetailSheet({
     setDone(true);
     onClose();
   };
+
+  const generateLeads = async () => {
+    setGenerateError(null);
+    setGenerateNotice(null);
+    setShowViewLeads(false);
+    setGeneratingLeads(true);
+    setLeadProgress({
+      progress: 0,
+      message: "Starting lead generation…",
+      stages: PROJECT_LEAD_PROGRESS_STAGES.map((stage) => ({
+        ...stage,
+        status: "pending" as const,
+      })),
+    });
+
+    try {
+      const res = await fetch(`/api/projects/${project.id}/generate-leads`, {
+        method: "POST",
+      });
+
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        setGenerateError(
+          data.message ??
+            "Could not generate context and leads. Check your Gemini API key.",
+        );
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line) as {
+            type: string;
+            progress?: number;
+            message?: string;
+            stages?: ProjectLeadProgressStage[];
+            project?: MarketProject;
+            leads?: LeadRecord[];
+            addedCount?: number;
+            error?: string;
+          };
+
+          if (event.type === "progress") {
+            setLeadProgress({
+              progress: event.progress ?? 0,
+              message: event.message ?? "",
+              stages: event.stages ?? [],
+            });
+          }
+
+          if (event.type === "error") {
+            setGenerateError(
+              event.message ??
+                event.error ??
+                "Could not generate context and leads.",
+            );
+            return;
+          }
+
+          if (event.type === "complete") {
+            if (event.project) onUpdated(event.project);
+            const added = event.addedCount ?? event.leads?.length ?? 0;
+            if (added === 0) {
+              setGenerateNotice(
+                "No new unique companies found — existing leads were kept.",
+              );
+            } else {
+              setGenerateNotice(`Added ${added} new lead${added === 1 ? "" : "s"}.`);
+            }
+            if (event.leads?.length) {
+              setLinkedLeads((prev) => {
+                const byId = new Map(prev.map((l) => [l.id, l]));
+                for (const lead of event.leads ?? []) {
+                  byId.set(lead.id, lead);
+                }
+                return Array.from(byId.values()).sort((a, b) => b.fitScore - a.fitScore);
+              });
+            }
+            setShowViewLeads(true);
+          }
+        }
+      }
+    } catch {
+      setGenerateError("Could not generate context and leads. Check your Gemini API key.");
+    } finally {
+      setGeneratingLeads(false);
+      setLeadProgress(null);
+    }
+  };
+
+  const viewProjectLeads = () => {
+    router.push(`/leads?project=${project.id}`);
+  };
+
+  const copyOpeningMessage = async (leadId: string, index: number, text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedMessageKey(`${leadId}-${index}`);
+    setTimeout(() => setCopiedMessageKey(null), 1500);
+  };
+
+  const ctx = project.projectLeadContext;
+  const hasContext = Boolean(ctx);
+  const canViewLeads =
+    showViewLeads || (hasContext && (linkedLeads.length > 0 || (ctx?.leadIds.length ?? 0) > 0));
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
@@ -217,6 +408,198 @@ export function ProjectDetailSheet({
           <p className="mt-1 text-xs text-emerald-700">{project.nextStep}</p>
         </div>
         <p className="text-xs text-slate-500">{project.expectedValue}</p>
+
+        <section className="rounded-lg border border-violet-100 bg-violet-50/30 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-slate-800">Context & leads</p>
+              <p className="mt-1 text-xs text-slate-600">
+                Classify this project, find companies, map CEO problems to your services, and
+                draft opening messages.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void generateLeads()}
+                disabled={generatingLeads}
+                className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                {generatingLeads
+                  ? "Generating…"
+                  : hasContext
+                    ? "Find more leads"
+                    : "Generate context & leads"}
+              </button>
+              {canViewLeads && !generatingLeads && (
+                <button
+                  type="button"
+                  onClick={viewProjectLeads}
+                  className="rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-50"
+                >
+                  View leads
+                </button>
+              )}
+            </div>
+          </div>
+
+          {generatingLeads && leadProgress && (
+            <ProjectLeadProgressPanel
+              progress={leadProgress.progress}
+              message={leadProgress.message}
+              stages={leadProgress.stages}
+            />
+          )}
+
+          {generateError && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {generateError}
+            </p>
+          )}
+          {generateNotice && (
+            <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+              {generateNotice}
+            </p>
+          )}
+
+          {hasContext && ctx && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <p className="text-xs font-medium text-slate-700">Keywords</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {ctx.keywords.map((k) => (
+                    <span
+                      key={k}
+                      className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600"
+                    >
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-700">Categories</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {ctx.categories.map((c) => (
+                    <span
+                      key={c}
+                      className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-700">Industries</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {ctx.industries.map((i) => (
+                    <span
+                      key={i}
+                      className="rounded-full bg-white px-2 py-0.5 text-xs text-slate-600"
+                    >
+                      {i}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {ctx.categoryInsights.map((insight) => (
+                <div
+                  key={insight.category}
+                  className="rounded-lg border border-slate-100 bg-white p-3"
+                >
+                  <span
+                    className={`inline-block rounded-full px-2 py-0.5 text-xs ${PROJECT_LEAD_CATEGORY_COLORS[insight.category]}`}
+                  >
+                    {PROJECT_LEAD_CATEGORY_LABELS[insight.category]}
+                  </span>
+                  <p className="mt-2 text-xs font-medium text-slate-800">CEO thinking</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    {insight.ceoThinking}
+                  </p>
+                  <p className="mt-3 text-xs font-medium text-slate-800">Top problems</p>
+                  <ol className="mt-1 list-inside list-decimal text-xs text-slate-600">
+                    {insight.topProblems.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ol>
+                  <p className="mt-3 text-xs font-medium text-slate-800">How you can help</p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                    {insight.serviceMapping}
+                  </p>
+                </div>
+              ))}
+
+              {linkedLeads.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-slate-700">
+                    Linked leads ({linkedLeads.length})
+                  </p>
+                  <div className="mt-2 space-y-2">
+                    {linkedLeads.map((lead) => (
+                      <div
+                        key={lead.id}
+                        className="rounded-lg border border-slate-100 bg-white p-3 text-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/leads?focus=${lead.id}`)}
+                            className="text-left font-medium text-violet-700 hover:underline"
+                          >
+                            {lead.company}
+                          </button>
+                          <span className="shrink-0 text-slate-500">Fit {lead.fitScore}</span>
+                        </div>
+                        {lead.projectLeadCategory && (
+                          <span
+                            className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] ${PROJECT_LEAD_CATEGORY_COLORS[lead.projectLeadCategory]}`}
+                          >
+                            {PROJECT_LEAD_CATEGORY_LABELS[lead.projectLeadCategory]}
+                          </span>
+                        )}
+                        {lead.openingMessages && lead.openingMessages.length > 0 && (
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedLeadId((id) => (id === lead.id ? null : lead.id))
+                              }
+                              className="text-xs font-medium text-slate-600 hover:text-slate-800"
+                            >
+                              {expandedLeadId === lead.id ? "Hide" : "Show"} opening messages (
+                              {lead.openingMessages.length})
+                            </button>
+                            {expandedLeadId === lead.id && (
+                              <div className="mt-2 space-y-2">
+                                {lead.openingMessages.map((msg, i) => (
+                                  <div
+                                    key={i}
+                                    className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700"
+                                  >
+                                    <p className="whitespace-pre-wrap">{msg}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => void copyOpeningMessage(lead.id, i, msg)}
+                                      className="mt-1 text-violet-700 hover:underline"
+                                    >
+                                      {copiedMessageKey === `${lead.id}-${i}` ? "Copied" : "Copy"}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
         <section>
           <p className="text-sm font-medium text-slate-800">Sources</p>

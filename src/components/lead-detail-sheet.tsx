@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AssignTaskButton } from "@/components/assign-task-button";
 import { LikeButton } from "@/components/like-button";
 import { CommentThread } from "@/components/comment-thread";
 import { CitationList } from "@/components/ui/citation-list";
+import {
+  PROJECT_LEAD_CATEGORY_COLORS,
+  PROJECT_LEAD_CATEGORY_LABELS,
+} from "@/lib/project-lead-labels";
 import type { LeadRecord } from "@/lib/types/domain";
 
 interface LeadDetailSheetProps {
@@ -225,13 +230,21 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
 }
 
 export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
+  const router = useRouter();
   const [current, setCurrent] = useState<LeadRecord | null>(lead);
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setCurrent(lead);
   }, [lead]);
 
   if (!current) return null;
+
+  const copyOpeningMessage = async (index: number, text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedMessageIndex(index);
+    setTimeout(() => setCopiedMessageIndex(null), 1500);
+  };
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
@@ -254,9 +267,49 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
         </div>
       </div>
       <div className="flex-1 space-y-4 overflow-y-auto p-5">
-        <span className="inline-block rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
-          {current.region} · Fit {current.fitScore}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-block rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
+            {current.region} · Fit {current.fitScore}
+          </span>
+          {current.source === "project" && (
+            <span className="inline-block rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
+              Project lead
+            </span>
+          )}
+          {current.projectLeadCategory && (
+            <span
+              className={`inline-block rounded-full px-2 py-0.5 text-xs ${PROJECT_LEAD_CATEGORY_COLORS[current.projectLeadCategory]}`}
+            >
+              {PROJECT_LEAD_CATEGORY_LABELS[current.projectLeadCategory]}
+            </span>
+          )}
+        </div>
+
+        {current.projectTitle && current.projectId && (
+          <section className="rounded-lg border border-slate-100 p-3">
+            <p className="text-xs font-medium text-slate-500">Linked project</p>
+            <button
+              type="button"
+              onClick={() => {
+                fetch(`/api/projects?id=${current.projectId}`)
+                  .then((r) => r.json())
+                  .then((d) => {
+                    if (d.project) {
+                      window.dispatchEvent(
+                        new CustomEvent("open-project", { detail: d.project }),
+                      );
+                    } else {
+                      router.push("/projects");
+                    }
+                  })
+                  .catch(() => router.push("/projects"));
+              }}
+              className="mt-1 text-sm font-medium text-violet-700 hover:underline"
+            >
+              {current.projectTitle}
+            </button>
+          </section>
+        )}
 
         {(current.whyPerfect || current.whyFit) && (
           <section className="rounded-lg bg-violet-50/40 p-4">
@@ -312,6 +365,29 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
           <p className="text-sm font-medium text-slate-800">Citations</p>
           <CitationList citations={current.sources} />
         </section>
+
+        {current.openingMessages && current.openingMessages.length > 0 && (
+          <section className="rounded-lg border border-slate-100 p-4">
+            <p className="text-sm font-medium text-slate-800">Opening messages</p>
+            <p className="mt-1 text-xs text-slate-500">
+              AI-generated options grounded in this project and lead category.
+            </p>
+            <div className="mt-3 space-y-3">
+              {current.openingMessages.map((msg, i) => (
+                <div key={i} className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+                  <p className="whitespace-pre-wrap">{msg}</p>
+                  <button
+                    type="button"
+                    onClick={() => void copyOpeningMessage(i, msg)}
+                    className="mt-2 text-violet-700 hover:underline"
+                  >
+                    {copiedMessageIndex === i ? "Copied" : "Copy message"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <OutreachSection lead={current} onUpdate={setCurrent} />
 

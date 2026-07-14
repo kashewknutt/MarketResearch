@@ -77,6 +77,63 @@ export const leadSchema = z
     whyFit: d.whyFit ?? d.whyPerfect ?? "",
   }));
 
+export const projectLeadCategorySchema = z.enum([
+  "already_using",
+  "in_need",
+  "would_benefit",
+]);
+
+export const projectClassifySchema = z.object({
+  keywords: z.array(z.string()).min(1),
+  categories: z.array(z.string()).min(1),
+  industries: z.array(z.string()).min(1),
+});
+
+export const projectLeadDiscoveryItemSchema = z
+  .object({
+    company: z.string(),
+    region: z.string(),
+    category: projectLeadCategorySchema,
+    fitScore: z.number().min(0).max(100),
+    signals: z.array(z.string()),
+    contactHints: z.string(),
+    whyFit: z.string().optional(),
+    whyPerfect: z.string().optional(),
+    pitchOutline: z.string().optional(),
+    contactPlan: z.string().optional(),
+    objections: z.array(z.string()).optional(),
+    sources: z.array(citationSchema).min(1),
+  })
+  .transform((d) => ({
+    ...d,
+    whyFit: d.whyFit ?? d.whyPerfect ?? "",
+  }));
+
+export const projectLeadDiscoverySchema = z.object({
+  leads: z.array(projectLeadDiscoveryItemSchema),
+});
+
+export const projectCategoryInsightSchema = z.object({
+  category: projectLeadCategorySchema,
+  ceoThinking: z.string(),
+  topProblems: z
+    .array(z.string())
+    .min(5)
+    .transform((items) => items.slice(0, 10)),
+  serviceMapping: z.string(),
+});
+
+export const projectCategoryInsightsSchema = z.object({
+  insights: z.array(projectCategoryInsightSchema).min(3),
+});
+
+export const projectOpeningMessagesSchema = z.object({
+  messages: z
+    .array(z.string())
+    .min(3)
+    .transform((items) => items.slice(0, 5)),
+});
+
 export const competitorSchema = z.object({
   name: z.string(),
   region: z.string().optional(),

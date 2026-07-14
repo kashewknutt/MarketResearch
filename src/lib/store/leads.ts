@@ -5,6 +5,10 @@ import { leads } from "@/lib/db/schema";
 import { getCurrentOrg } from "@/lib/auth/session";
 import type { LeadRecord } from "@/lib/types/domain";
 
+export function normalizeCompanyName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 export async function saveLeads(records: LeadRecord[]): Promise<void> {
   const { orgId } = await getCurrentOrg();
   const db = getDb();
@@ -67,6 +71,20 @@ export async function getLeadsPage(offset: number, limit: number): Promise<Leads
 export async function getLeadById(id: string): Promise<LeadRecord | null> {
   const all = await getAllLeads();
   return all.find((l) => l.id === id) ?? null;
+}
+
+export async function getLeadsByIds(ids: string[]): Promise<LeadRecord[]> {
+  if (ids.length === 0) return [];
+  const all = await getAllLeads();
+  const byId = new Map(all.map((l) => [l.id, l]));
+  return ids.map((id) => byId.get(id)).filter((l): l is LeadRecord => l != null);
+}
+
+export async function getLeadsByProjectId(projectId: string): Promise<LeadRecord[]> {
+  const all = await getAllLeads();
+  return all
+    .filter((l) => l.projectId === projectId)
+    .sort((a, b) => b.fitScore - a.fitScore);
 }
 
 export function newLeadId(): string {

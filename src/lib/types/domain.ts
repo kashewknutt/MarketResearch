@@ -83,6 +83,25 @@ export interface DemandSignal {
 
 export type ProjectStatus = "active" | "done";
 
+export type ProjectLeadCategory = "already_using" | "in_need" | "would_benefit";
+
+export interface ProjectLeadCategoryInsight {
+  category: ProjectLeadCategory;
+  ceoThinking: string;
+  topProblems: string[];
+  serviceMapping: string;
+}
+
+export interface ProjectLeadContext {
+  keywords: string[];
+  categories: string[];
+  industries: string[];
+  categoryInsights: ProjectLeadCategoryInsight[];
+  leadIds: string[];
+  generatedAt: string;
+  provenance: Provenance;
+}
+
 export interface MarketProject {
   id: string;
   region: RegionCode;
@@ -104,6 +123,7 @@ export interface MarketProject {
   precedents?: PrecedentRecord[];
   confidenceScore?: number;
   pipelineSteps?: string[];
+  projectLeadContext?: ProjectLeadContext;
 }
 
 export type ExpenseCategory =
@@ -357,6 +377,8 @@ export interface MarketingSocialSnapshot {
 
 export type LeadStatus = "new" | "qualified" | "contacted" | "archived";
 
+export type LeadSource = "discovery" | "project";
+
 export interface LeadRecord {
   id: string;
   company: string;
@@ -379,6 +401,11 @@ export interface LeadRecord {
   outreachMessage?: string;
   outreachStatus?: "none" | "contact_found" | "drafted" | "sent";
   outreachUpdatedAt?: string;
+  source?: LeadSource;
+  projectId?: string;
+  projectTitle?: string;
+  projectLeadCategory?: ProjectLeadCategory;
+  openingMessages?: string[];
 }
 
 export interface CompetitorRecord {
