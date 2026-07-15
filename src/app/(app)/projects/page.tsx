@@ -7,6 +7,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { PageLoading } from "@/components/ui/page-loading";
 import { ProjectDetailSheet } from "@/components/project-detail-sheet";
+import { NewProjectForm } from "@/components/new-project-form";
 import { LikeCell } from "@/components/like-cell";
 import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
 import { formatMoney } from "@/lib/currency";
@@ -31,6 +32,7 @@ function ProjectsPageInner() {
   const [filter, setFilter] = useState<string>("all");
   const [selected, setSelected] = useState<MarketProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showNewProject, setShowNewProject] = useState(false);
 
   const load = useCallback(() => {
     fetch("/api/projects")
@@ -111,11 +113,20 @@ function ProjectsPageInner() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Evidence-backed opportunities per region. Click a row for full analysis.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-800">Projects</h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Evidence-backed opportunities per region. Click a row for full analysis.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowNewProject(true)}
+          className="shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+        >
+          New project
+        </button>
       </header>
       <div className="flex gap-2">
         <FilterBtn active={filter === "all"} onClick={() => setFilter("all")} label="All" />
@@ -140,6 +151,17 @@ function ProjectsPageInner() {
           setSelected(p);
         }}
       />
+      {showNewProject && (
+        <NewProjectForm
+          regions={regions}
+          onClose={() => setShowNewProject(false)}
+          onCreated={(project) => {
+            setProjects((list) => [project, ...list]);
+            setShowNewProject(false);
+            setSelected(project);
+          }}
+        />
+      )}
     </div>
   );
 }
