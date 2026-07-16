@@ -6,6 +6,7 @@ import { useAppRefresh } from "@/lib/hooks/use-app-refresh";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
+import { NewLeadForm } from "@/components/new-lead-form";
 import { LikeCell } from "@/components/like-cell";
 import { PageLoading } from "@/components/ui/page-loading";
 import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
@@ -83,6 +84,7 @@ function LeadsPageInner() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
+  const [showNewLead, setShowNewLead] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -194,12 +196,23 @@ function LeadsPageInner() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold text-slate-800">Leads</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Companies likely to need your services — scored with traceable sources. Use
-          Refresh in the top bar to re-run lead discovery, or generate project-linked leads
-          from a project.
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-800">Leads</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Companies likely to need your services — scored with traceable sources. Use
+              Refresh in the top bar to re-run lead discovery, or generate project-linked leads
+              from a project.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowNewLead(true)}
+            className="shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+          >
+            New lead
+          </button>
+        </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {(
             [
@@ -286,6 +299,17 @@ function LeadsPageInner() {
           refresh();
         }}
       />
+      {showNewLead && (
+        <NewLeadForm
+          onClose={() => setShowNewLead(false)}
+          onCreated={(lead) => {
+            setLeads((list) => [lead, ...list]);
+            setTotal((t) => t + 1);
+            setShowNewLead(false);
+            setSelected(lead);
+          }}
+        />
+      )}
     </div>
   );
 }
