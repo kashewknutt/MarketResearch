@@ -162,6 +162,23 @@ function SettingsContent() {
             })
           }
         />
+        <div>
+          <label className="text-xs font-medium text-slate-500">
+            Cash on hand ({profile.currency})
+          </label>
+          <input
+            type="number"
+            min={0}
+            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            value={profile.cashOnHand ?? 0}
+            onChange={(e) =>
+              setProfile({ ...profile, cashOnHand: Number(e.target.value) })
+            }
+          />
+          <p className="mt-1 text-xs text-slate-400">
+            Used to compute burn rate and runway on the Financial Analysis page.
+          </p>
+        </div>
       </section>
 
       <p className="text-xs text-slate-500">

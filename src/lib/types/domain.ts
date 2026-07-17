@@ -39,6 +39,8 @@ export interface OnboardingProfile {
   /** Target monthly recurring revenue at end of goalMonths (not annual/total/profit). */
   targetMrr: number;
   goalMonths: number;
+  /** Cash currently in the bank, used to compute burn rate and runway. Defaults to 0. */
+  cashOnHand?: number;
   strategicGoals: string;
   constraints: string;
   completedAt?: string;

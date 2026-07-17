@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   CartesianGrid,
   ComposedChart,
@@ -14,7 +16,8 @@ import {
   YAxis,
 } from "recharts";
 import { formatMoney } from "@/lib/currency";
-import type { MonthlyProjection } from "@/lib/types/domain";
+import { EXPENSE_CATEGORY_LABELS } from "@/lib/research/expense-line-items";
+import type { ExpenseCategory, MonthlyProjection } from "@/lib/types/domain";
 
 function useChartReady(projectionsLength: number) {
   const [mounted, setMounted] = useState(false);
@@ -171,6 +174,132 @@ export function FinancialProfitChart({
           <Tooltip formatter={(value) => fmt(Number(value ?? 0))} />
           <Bar dataKey="profit" name="Monthly profit" fill="#10b981" radius={[2, 2, 0, 0]} />
         </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+const EXPENSE_CATEGORY_COLORS: Record<ExpenseCategory, string> = {
+  people: "#7c3aed",
+  tools: "#0ea5e9",
+  marketing: "#f59e0b",
+  operations: "#10b981",
+  other: "#94a3b8",
+};
+
+const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  "people",
+  "tools",
+  "marketing",
+  "operations",
+  "other",
+];
+
+export function FinancialExpenseBreakdownChart({
+  projections,
+  currency,
+}: {
+  projections: MonthlyProjection[];
+  currency: string;
+}) {
+  const ready = useChartReady(projections.length);
+  const data = projections.map((p) => {
+    const row: Record<string, string | number> = { month: `M${p.month}` };
+    for (const category of EXPENSE_CATEGORIES) {
+      row[category] = p.expenseByCategory?.[category] ?? 0;
+    }
+    return row;
+  });
+  const fmt = (v: number) => formatMoney(v, currency);
+  const hasBreakdown = projections.some((p) => p.expenseByCategory);
+
+  if (!ready) {
+    return (
+      <div className="flex h-64 min-h-[256px] min-w-0 items-center justify-center rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-400">
+        Loading chart…
+      </div>
+    );
+  }
+
+  if (!hasBreakdown) {
+    return (
+      <div className="flex h-64 min-h-[256px] min-w-0 items-center justify-center rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-400">
+        No expense category breakdown available for this projection.
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-64 min-h-[256px] min-w-0 w-full rounded-xl border border-slate-100 bg-white p-4">
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(Number(v))} />
+          <Tooltip formatter={(value) => fmt(Number(value ?? 0))} />
+          <Legend />
+          {EXPENSE_CATEGORIES.map((category) => (
+            <Bar
+              key={category}
+              dataKey={category}
+              name={EXPENSE_CATEGORY_LABELS[category]}
+              stackId="expenses"
+              fill={EXPENSE_CATEGORY_COLORS[category]}
+            />
+          ))}
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function FinancialBurnRunwayChart({
+  projections,
+  currency,
+  cashOnHand,
+}: {
+  projections: MonthlyProjection[];
+  currency: string;
+  cashOnHand: number;
+}) {
+  const ready = useChartReady(projections.length);
+  let balance = cashOnHand;
+  const data = projections.map((p) => {
+    const net =
+      p.netCash ??
+      p.netMrr ??
+      (p.totalRevenue ?? p.cashCollected ?? 0) - (p.totalExpenses ?? p.expenses ?? p.investment);
+    balance += net;
+    return { month: `M${p.month}`, balance };
+  });
+  const fmt = (v: number) => formatMoney(v, currency);
+
+  if (!ready) {
+    return (
+      <div className="flex h-64 min-h-[256px] min-w-0 items-center justify-center rounded-xl border border-slate-100 bg-white p-4 text-sm text-slate-400">
+        Loading chart…
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-64 min-h-[256px] min-w-0 w-full rounded-xl border border-slate-100 bg-white p-4">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+          <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => fmt(Number(v))} />
+          <Tooltip formatter={(value) => fmt(Number(value ?? 0))} />
+          <ReferenceLine y={0} stroke="#f43f5e" strokeDasharray="4 4" />
+          <Area
+            type="monotone"
+            dataKey="balance"
+            name="Projected cash balance"
+            stroke="#7c3aed"
+            fill="#c4b5fd"
+            fillOpacity={0.4}
+          />
+        </AreaChart>
       </ResponsiveContainer>
     </div>
   );

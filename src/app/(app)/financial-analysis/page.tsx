@@ -7,6 +7,8 @@ import { LikeButton } from "@/components/like-button";
 import { CommentThread } from "@/components/comment-thread";
 import { FinancialMetricGrid } from "@/components/financial-metric-grid";
 import {
+  FinancialBurnRunwayChart,
+  FinancialExpenseBreakdownChart,
   FinancialInflowOutflowChart,
   FinancialMrrChart,
 } from "@/components/financial-projection-chart";
@@ -76,6 +78,26 @@ export default function FinancialAnalysisPage() {
     );
     return { conservative: conservative.finalMrr, ambitious: ambitious.finalMrr };
   }, [profile, financial?.metricWorkbook]);
+
+  const burnAndRunway = useMemo(() => {
+    if (!financial?.projections.length) return null;
+    const cashOnHand = profile?.cashOnHand ?? 0;
+    let balance = cashOnHand;
+    let runwayMonths: number | null = null;
+    let lastNet = 0;
+    for (const p of financial.projections) {
+      lastNet =
+        p.netCash ??
+        p.netMrr ??
+        (p.totalRevenue ?? p.cashCollected ?? 0) - (p.totalExpenses ?? p.expenses ?? p.investment);
+      balance += lastNet;
+      if (runwayMonths === null && balance <= 0) {
+        runwayMonths = p.month;
+      }
+    }
+    const burnRate = lastNet < 0 ? -lastNet : 0;
+    return { burnRate, runwayMonths, projectionMonths: financial.projections.length };
+  }, [financial?.projections, profile?.cashOnHand]);
 
   const updateWorkbook = useCallback((wb: FinancialMetricWorkbook) => {
     setMetricWorkbook(wb);
@@ -172,6 +194,34 @@ export default function FinancialAnalysisPage() {
         />
       </div>
 
+      {burnAndRunway && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <MetricCard
+            label="Latest monthly burn rate"
+            value={
+              burnAndRunway.burnRate > 0
+                ? money(burnAndRunway.burnRate)
+                : "Cash-flow positive"
+            }
+            currency={burnAndRunway.burnRate > 0 ? currency : undefined}
+            hint={`Cash on hand: ${money(profile.cashOnHand ?? 0)}`}
+          />
+          <MetricCard
+            label="Runway"
+            value={
+              burnAndRunway.runwayMonths !== null
+                ? `${burnAndRunway.runwayMonths} months`
+                : `${burnAndRunway.projectionMonths}+ months`
+            }
+            hint={
+              burnAndRunway.runwayMonths !== null
+                ? "Months until projected cash balance reaches zero"
+                : "Cash balance stays positive through the projection window"
+            }
+          />
+        </div>
+      )}
+
       {scenarioEnds && (
         <p className="text-xs text-slate-600">
           End MRR — Conservative: {money(scenarioEnds.conservative)} · Ambitious:{" "}
@@ -258,6 +308,28 @@ export default function FinancialAnalysisPage() {
             currency={currency}
             targetMrr={profile.targetMrr}
             scenarioLabel={`Active: ${wb.activeScenario}`}
+          />
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">
+            Expense breakdown by category ({wb.activeScenario})
+          </h2>
+          <FinancialExpenseBreakdownChart
+            projections={financial.projections}
+            currency={currency}
+          />
+        </div>
+        <div>
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">
+            Cash balance &amp; runway ({wb.activeScenario})
+          </h2>
+          <FinancialBurnRunwayChart
+            projections={financial.projections}
+            currency={currency}
+            cashOnHand={profile.cashOnHand ?? 0}
           />
         </div>
       </section>
