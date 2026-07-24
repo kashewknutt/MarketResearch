@@ -1,10 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentOrg, NoOrgMembershipError } from "@/lib/auth/session";
-import { isOnboardingComplete } from "@/lib/store/settings";
-import { isSetupComplete } from "@/lib/store/setup";
 
 const FEATURES = [
   {
@@ -92,7 +88,7 @@ const INTEGRATIONS = [
   },
 ];
 
-function LandingNav() {
+function LandingNav({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
     <header className="sticky top-0 z-10 border-b border-slate-100 bg-white/70 backdrop-blur">
       <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
@@ -118,21 +114,30 @@ function LandingNav() {
             FAQ
           </a>
         </div>
-        <Link
-          href="/login"
-          className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
-        >
-          Sign in
-        </Link>
+        {isAuthenticated ? (
+          <Link
+            href="/tasks"
+            className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+          >
+            Go to dashboard
+          </Link>
+        ) : (
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+          >
+            Sign in
+          </Link>
+        )}
       </nav>
     </header>
   );
 }
 
-function LandingPage() {
+function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-sky-50/40 via-white to-violet-50/30">
-      <LandingNav />
+      <LandingNav isAuthenticated={isAuthenticated} />
 
       <section className="relative flex min-h-[calc(100vh-65px)] flex-col items-center justify-center overflow-hidden px-6">
         <div
@@ -163,15 +168,26 @@ function LandingPage() {
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-            <Link
-              href="/login"
-              className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-8 py-3 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
-            >
-              Get started
-            </Link>
-            <p className="text-xs text-slate-400">
-              Sign in with Google to continue.
-            </p>
+            {isAuthenticated ? (
+              <Link
+                href="/tasks"
+                className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-8 py-3 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+              >
+                Go to dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-8 py-3 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+                >
+                  Get started
+                </Link>
+                <p className="text-xs text-slate-400">
+                  Sign in with Google to continue.
+                </p>
+              </>
+            )}
           </div>
 
           <div className="mt-16 flex items-center justify-center gap-6 text-xs text-slate-400 sm:gap-10">
@@ -258,10 +274,10 @@ function LandingPage() {
 
       <section className="px-6 pb-16 text-center">
         <Link
-          href="/login"
+          href={isAuthenticated ? "/tasks" : "/login"}
           className="inline-flex items-center justify-center rounded-lg bg-violet-600 px-8 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
         >
-          Get started
+          {isAuthenticated ? "Go to dashboard" : "Get started"}
         </Link>
       </section>
 
@@ -291,47 +307,10 @@ function LandingPage() {
   );
 }
 
-function NoOrgAccess() {
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-b from-sky-50/40 via-white to-violet-50/30 px-6 text-center">
-      <p className="text-sm text-slate-600">
-        You&apos;re signed in, but you haven&apos;t been added to an organization yet.
-      </p>
-      <p className="mt-2 text-xs text-slate-400">
-        Ask your organization&apos;s owner to add your email from the Team page.
-      </p>
-    </div>
-  );
-}
-
 export default async function Home() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
   const isAuthenticated = Boolean(data?.claims);
 
-  if (!isAuthenticated) {
-    return <LandingPage />;
-  }
-
-  let role: "owner" | "member";
-  try {
-    ({ role } = await getCurrentOrg());
-  } catch (err) {
-    if (err instanceof NoOrgMembershipError) {
-      return <NoOrgAccess />;
-    }
-    throw err;
-  }
-
-  if (role === "member") {
-    redirect("/tasks");
-  }
-
-  if (await isOnboardingComplete()) {
-    redirect("/dashboard");
-  }
-  if (!(await isSetupComplete())) {
-    redirect("/setup");
-  }
-  redirect("/onboarding");
+  return <LandingPage isAuthenticated={isAuthenticated} />;
 }
