@@ -159,12 +159,13 @@ function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
           </span>
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-800 sm:text-6xl">
-            One clear guide through every market decision.
+            Market research and business planning software for service companies.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-slate-500 sm:text-lg">
-            Demand signals, project opportunities, financial projections, and
-            ad performance, researched, tracked, and kept current, all in one
-            place.
+            Northstar is a web app that researches market demand for your
+            business, tracks the leads and projects it finds, models the
+            financial outcome, and helps you plan and run marketing around
+            it, all from one dashboard tied to your account.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
@@ -202,13 +203,17 @@ function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
 
       <section className="mx-auto max-w-2xl px-6 pb-24 text-center">
         <h2 className="text-sm font-medium uppercase tracking-wide text-violet-600">
-          What it does
+          What is Northstar?
         </h2>
         <p className="mt-4 text-base leading-relaxed text-slate-600">
-          Northstar turns scattered signals into one clear picture. It finds
-          demand, tracks the leads and projects worth pursuing, models the
-          financial upside, and keeps a pulse on how your ads are doing.
-          Everything refreshes on demand and stays tied to your own account.
+          Northstar is a market research and business planning platform built
+          for service-based companies. It automatically researches demand for
+          your services in a given market, using live data from Google
+          Search, Reddit, LinkedIn, YouTube, and Apify. It then helps you
+          track the leads and projects that research surfaces, model the
+          revenue, expenses, and profit each one could produce, and plan the
+          marketing needed to win them. Every organization&apos;s data is
+          private to its own account.
         </p>
       </section>
 

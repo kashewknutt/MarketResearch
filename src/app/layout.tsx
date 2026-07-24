@@ -14,7 +14,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Northstar",
-  description: "Real-time market research for service-based companies",
+  description:
+    "Northstar is a market research and business planning platform for service-based companies: it researches market demand, tracks leads and projects, models financials, and plans marketing, all in one dashboard.",
 };
 
 export default function RootLayout({
