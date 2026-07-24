@@ -46,6 +46,29 @@ const FEATURES = [
   },
 ];
 
+const FAQS = [
+  {
+    question: "Who is Northstar for?",
+    answer:
+      "Service-based companies and teams who need a single, current picture of demand, pipeline, financials, and marketing performance instead of stitching it together across spreadsheets and tools.",
+  },
+  {
+    question: "Is my organization's data private?",
+    answer:
+      "Yes. Every project, lead, and financial model is scoped to your organization. Other organizations on Northstar can never see it.",
+  },
+  {
+    question: "How does the research stay current?",
+    answer:
+      "Northstar uses Google's Gemini with live Google Search grounding, plus direct integrations with Reddit, LinkedIn, YouTube, and Apify, so demand signals and performance numbers refresh from real sources on demand.",
+  },
+  {
+    question: "Do you sell my data?",
+    answer:
+      "No. We don't sell your personal information or your organization's data. See our Privacy Policy for the full details.",
+  },
+];
+
 const INTEGRATIONS = [
   {
     name: "Gemini",
@@ -90,6 +113,9 @@ function LandingNav() {
           </a>
           <a href="#integrations" className="hover:text-slate-800">
             Integrations
+          </a>
+          <a href="#faq" className="hover:text-slate-800">
+            FAQ
           </a>
         </div>
         <Link
@@ -212,6 +238,24 @@ function LandingPage() {
         </div>
       </section>
 
+      <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-6 pb-24">
+        <h2 className="text-center text-sm font-medium uppercase tracking-wide text-violet-600">
+          Frequently asked questions
+        </h2>
+        <div className="mt-8 space-y-6">
+          {FAQS.map((faq) => (
+            <div key={faq.question}>
+              <h3 className="text-sm font-semibold text-slate-800">
+                {faq.question}
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
+                {faq.answer}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="px-6 pb-16 text-center">
         <Link
           href="/login"
@@ -222,7 +266,16 @@ function LandingPage() {
       </section>
 
       <footer className="border-t border-slate-100 px-6 py-8 text-center">
-        <p className="text-xs text-slate-400">
+        <div className="flex items-center justify-center gap-4 text-xs text-slate-400">
+          <Link href="/privacy" className="hover:text-slate-600 hover:underline">
+            Privacy Policy
+          </Link>
+          <span className="h-3 w-px bg-slate-200" />
+          <Link href="/terms" className="hover:text-slate-600 hover:underline">
+            Terms of Service
+          </Link>
+        </div>
+        <p className="mt-3 text-xs text-slate-400">
           Created and maintained by{" "}
           <a
             href="https://valnee.com"
