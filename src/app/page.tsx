@@ -42,26 +42,40 @@ const FEATURES = [
   },
 ];
 
+const HOW_IT_WORKS = [
+  {
+    step: "1",
+    title: "Find demand",
+    description: "We research your market with live, real-world data.",
+  },
+  {
+    step: "2",
+    title: "Track it",
+    description: "Every lead and project lands in one clean pipeline.",
+  },
+  {
+    step: "3",
+    title: "Win it",
+    description: "Model the numbers, plan the marketing, close the deal.",
+  },
+];
+
 const FAQS = [
   {
     question: "Who is Northstar for?",
-    answer:
-      "Service-based companies and teams who need a single, current picture of demand, pipeline, financials, and marketing performance instead of stitching it together across spreadsheets and tools.",
+    answer: "Service businesses that need one clear view of demand, pipeline, and profit.",
   },
   {
-    question: "Is my organization's data private?",
-    answer:
-      "Yes. Every project, lead, and financial model is scoped to your organization. Other organizations on Northstar can never see it.",
+    question: "Is my data private?",
+    answer: "Yes. Your organization's data stays yours, always.",
   },
   {
-    question: "How does the research stay current?",
-    answer:
-      "Northstar uses Google's Gemini with live Google Search grounding, plus direct integrations with Reddit, LinkedIn, YouTube, and Apify, so demand signals and performance numbers refresh from real sources on demand.",
+    question: "How fresh is the research?",
+    answer: "Live. Pulled on demand from Search, Reddit, LinkedIn, YouTube, and Apify.",
   },
   {
     question: "Do you sell my data?",
-    answer:
-      "No. We don't sell your personal information or your organization's data. See our Privacy Policy for the full details.",
+    answer: "Never. See our Privacy Policy for the details.",
   },
 ];
 
@@ -158,14 +172,12 @@ function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
             Northstar
           </span>
 
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-800 sm:text-6xl">
-            Market research and business planning software for service companies.
+          <h1 className="mt-6 text-3xl font-semibold tracking-tight text-slate-800 sm:text-5xl">
+            Find demand. Track it. Win it.
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-slate-500 sm:text-lg">
-            Northstar is a web app that researches market demand for your
-            business, tracks the leads and projects it finds, models the
-            financial outcome, and helps you plan and run marketing around
-            it, all from one dashboard tied to your account.
+          <p className="mx-auto mt-5 max-w-md text-base leading-relaxed text-slate-500 sm:text-lg">
+            Northstar researches market demand for service businesses, then
+            helps you turn it into leads, revenue, and marketing that works.
           </p>
 
           <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
@@ -201,20 +213,28 @@ function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-2xl px-6 pb-24 text-center">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-violet-600">
-          What is Northstar?
+      <section className="mx-auto max-w-4xl px-6 pb-24">
+        <h2 className="text-center text-sm font-medium uppercase tracking-wide text-violet-600">
+          How it works
         </h2>
-        <p className="mt-4 text-base leading-relaxed text-slate-600">
-          Northstar is a market research and business planning platform built
-          for service-based companies. It automatically researches demand for
-          your services in a given market, using live data from Google
-          Search, Reddit, LinkedIn, YouTube, and Apify. It then helps you
-          track the leads and projects that research surfaces, model the
-          revenue, expenses, and profit each one could produce, and plan the
-          marketing needed to win them. Every organization&apos;s data is
-          private to its own account.
-        </p>
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {HOW_IT_WORKS.map((item) => (
+            <div
+              key={item.step}
+              className="rounded-2xl border border-slate-100 bg-white p-5 text-center"
+            >
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-semibold text-violet-700">
+                {item.step}
+              </span>
+              <h3 className="mt-3 text-sm font-semibold text-slate-800">
+                {item.title}
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-slate-500">
+                {item.description}
+              </p>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section id="features" className="mx-auto max-w-4xl scroll-mt-20 px-6 pb-24">
