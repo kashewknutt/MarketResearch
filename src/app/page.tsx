@@ -127,6 +127,9 @@ function LandingNav({ isAuthenticated }: { isAuthenticated: boolean }) {
           <a href="#faq" className="hover:text-slate-800">
             FAQ
           </a>
+          <Link href="/privacy" className="hover:text-slate-800">
+            Privacy
+          </Link>
         </div>
         {isAuthenticated ? (
           <Link
@@ -277,6 +280,24 @@ function LandingPage({ isAuthenticated }: { isAuthenticated: boolean }) {
             </div>
           ))}
         </div>
+      </section>
+
+      <section id="your-data" className="mx-auto max-w-2xl scroll-mt-20 px-6 pb-24 text-center">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-violet-600">
+          Your data
+        </h2>
+        <p className="mt-4 text-sm leading-relaxed text-slate-600">
+          We ask you to sign in with Google so we know it&apos;s really you
+          and can keep your work private to your organization. If you connect
+          LinkedIn, YouTube, Reddit, or Apify, we only use that access to
+          pull the performance data and publish the content you ask for.
+          Nothing is sold, and you can disconnect any account at any time.
+          Read the full{" "}
+          <Link href="/privacy" className="text-violet-600 hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </section>
 
       <section id="faq" className="mx-auto max-w-3xl scroll-mt-20 px-6 pb-24">
