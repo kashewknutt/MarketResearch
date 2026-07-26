@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { generateStructuredJson } from "@/lib/ai/gemini";
 import { projectsPrompt } from "@/lib/ai/prompts";
 import { createProvenance } from "@/lib/db/provenance";
+import { enrichProjectsForRegion } from "@/lib/research/stages/project-enrichment";
 import {
   clearProjectsForRegion,
   countActiveByRegion,
@@ -133,12 +134,21 @@ export async function replaceCompletedProject(
     false,
     undefined,
   );
-  return created[created.length - 1] ?? null;
+  if (created.length === 0) return null;
+
+  const enriched = await enrichProjectsForRegion(
+    profile,
+    region,
+    randomUUID(),
+    created.map((p) => p.id),
+  );
+  return enriched[enriched.length - 1] ?? created[created.length - 1] ?? null;
 }
 
 /**
  * Fetches `count` brand-new AI-generated projects for a region on demand,
- * appended to whatever is already active (no top-up/cap semantics).
+ * appended to whatever is already active (no top-up/cap semantics), then
+ * enriches them with precedents, regional pricing, and sourced citations.
  */
 export async function fetchProjectsOnDemand(
   profile: OnboardingProfile,
@@ -155,5 +165,12 @@ export async function fetchProjectsOnDemand(
     await saveProject(newProjects[i], startOrder + i);
   }
 
-  return newProjects;
+  if (newProjects.length === 0) return newProjects;
+
+  return enrichProjectsForRegion(
+    profile,
+    region,
+    randomUUID(),
+    newProjects.map((p) => p.id),
+  );
 }

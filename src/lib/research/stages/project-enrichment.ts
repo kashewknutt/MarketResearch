@@ -33,8 +33,13 @@ export async function enrichProjectsForRegion(
   profile: OnboardingProfile,
   region: string,
   jobId: string,
-): Promise<void> {
-  const projects = await getProjectsByRegion(region, "active");
+  projectIds?: string[],
+): Promise<MarketProject[]> {
+  const allActive = await getProjectsByRegion(region, "active");
+  const projects = projectIds
+    ? allActive.filter((p) => projectIds.includes(p.id))
+    : allActive;
+  const enrichedProjects: MarketProject[] = [];
   const trace: AiCallTrace = {
     operation: `research.enrich_projects_${region}`,
     category: "research",
@@ -150,6 +155,8 @@ Return JSON:
       { profile, project, integrationNotes: [] },
       { jobId, stageId: "project_enrichment" },
     );
-    void ctx;
+    enrichedProjects.push(ctx.project);
   }
+
+  return enrichedProjects;
 }
