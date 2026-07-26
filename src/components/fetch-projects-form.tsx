@@ -9,8 +9,12 @@ interface FetchProjectsFormProps {
   onFetched: (projects: MarketProject[]) => void;
 }
 
+const CUSTOM_REGION_VALUE = "__custom__";
+
 export function FetchProjectsForm({ regions, onClose, onFetched }: FetchProjectsFormProps) {
-  const [region, setRegion] = useState(regions[0] ?? "US");
+  const [regionChoice, setRegionChoice] = useState(regions[0] ?? CUSTOM_REGION_VALUE);
+  const [customRegion, setCustomRegion] = useState("");
+  const region = regionChoice === CUSTOM_REGION_VALUE ? customRegion : regionChoice;
   const [count, setCount] = useState("5");
   const [serviceDomain, setServiceDomain] = useState("");
   const [targetAudience, setTargetAudience] = useState("");
@@ -70,18 +74,27 @@ export function FetchProjectsForm({ regions, onClose, onFetched }: FetchProjects
         <div className="mt-6 space-y-4">
           <div>
             <label className="text-xs font-medium text-slate-500">Region</label>
-            <input
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              list="fetch-projects-regions"
-              placeholder="e.g. US"
-            />
-            <datalist id="fetch-projects-regions">
+            <select
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={regionChoice}
+              onChange={(e) => setRegionChoice(e.target.value)}
+            >
               {regions.map((r) => (
-                <option key={r} value={r} />
+                <option key={r} value={r}>
+                  {r}
+                </option>
               ))}
-            </datalist>
+              <option value={CUSTOM_REGION_VALUE}>Custom region…</option>
+            </select>
+            {regionChoice === CUSTOM_REGION_VALUE && (
+              <input
+                className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                value={customRegion}
+                onChange={(e) => setCustomRegion(e.target.value)}
+                placeholder="e.g. Germany"
+                autoFocus
+              />
+            )}
           </div>
 
           <div>
