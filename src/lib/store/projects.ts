@@ -43,6 +43,17 @@ export async function getAllActiveProjects(): Promise<MarketProject[]> {
   return rows.map((r) => JSON.parse(r.data) as MarketProject);
 }
 
+/** Every project for the org, active and done — done status is shared org-wide, not per-user. */
+export async function getAllProjects(): Promise<MarketProject[]> {
+  const { orgId } = await getCurrentOrg();
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.orgId, orgId));
+  return rows.map((r) => JSON.parse(r.data) as MarketProject);
+}
+
 export async function getProjectById(
   id: string,
 ): Promise<MarketProject | null> {

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import {
-  getAllActiveProjects,
+  getAllProjects,
   getProjectById,
   getProjectsByRegion,
   saveProject,
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json({ project });
   }
-  const projects = await getAllActiveProjects();
+  const projects = await getAllProjects();
   const profile = await getProfile();
   return NextResponse.json({ projects, regions: profile?.regions ?? [] });
 }

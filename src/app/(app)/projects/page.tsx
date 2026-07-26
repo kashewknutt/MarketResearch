@@ -69,6 +69,7 @@ function ProjectsPageInner() {
   );
 
   const isLiked = useCallback((row: MarketProject) => likes[row.id]?.likedByMe ?? false, [likes]);
+  const isDone = useCallback((row: MarketProject) => row.status === "done", []);
 
   const columns = useMemo(
     () =>
@@ -80,7 +81,19 @@ function ProjectsPageInner() {
             <LikeCell liked={likes[row.original.id]} onToggle={() => toggle(row.original.id)} />
           ),
         }),
-        col.accessor("title", { header: "Project", cell: (i) => i.getValue() }),
+        col.accessor("title", {
+          header: "Project",
+          cell: ({ row }) => (
+            <span className="flex items-center gap-2">
+              {row.original.title}
+              {row.original.status === "done" && (
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-700">
+                  Done
+                </span>
+              )}
+            </span>
+          ),
+        }),
         col.accessor("region", { header: "Region" }),
         col.accessor("effort", { header: "Effort" }),
         col.accessor("ticketSize", {
@@ -150,6 +163,7 @@ function ProjectsPageInner() {
         columns={columns}
         onRowClick={(row) => setSelected(row)}
         isLiked={isLiked}
+        isDone={isDone}
       />
       <ProjectDetailSheet
         project={selected}

@@ -17,6 +17,7 @@ export function DataTable<T>({
   onRowClick,
   filterPlaceholder = "Filter…",
   isLiked,
+  isDone,
 }: {
   data: T[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -25,15 +26,20 @@ export function DataTable<T>({
   filterPlaceholder?: string;
   /** If provided, shows a "Liked only" toggle that filters rows down to ones this returns true for. */
   isLiked?: (row: T) => boolean;
+  /** If provided, shows a "Done only" toggle that filters rows down to ones this returns true for. */
+  isDone?: (row: T) => boolean;
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [likedOnly, setLikedOnly] = useState(false);
+  const [doneOnly, setDoneOnly] = useState(false);
 
-  const visibleData = useMemo(
-    () => (isLiked && likedOnly ? data.filter(isLiked) : data),
-    [data, isLiked, likedOnly],
-  );
+  const visibleData = useMemo(() => {
+    let rows = data;
+    if (isLiked && likedOnly) rows = rows.filter(isLiked);
+    if (isDone && doneOnly) rows = rows.filter(isDone);
+    return rows;
+  }, [data, isLiked, likedOnly, isDone, doneOnly]);
 
   const table = useReactTable({
     data: visibleData,
@@ -65,6 +71,17 @@ export function DataTable<T>({
                 className="rounded border-slate-300"
               />
               ♥ Liked only
+            </label>
+          )}
+          {isDone && (
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <input
+                type="checkbox"
+                checked={doneOnly}
+                onChange={(e) => setDoneOnly(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              ✓ Done only
             </label>
           )}
         </div>
