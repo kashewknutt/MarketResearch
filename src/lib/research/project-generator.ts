@@ -126,9 +126,6 @@ export async function replaceCompletedProject(
   profile: OnboardingProfile,
   region: RegionCode,
 ): Promise<MarketProject | null> {
-  const active = await countActiveByRegion(region);
-  if (active >= PROJECTS_PER_REGION) return null;
-
   const created = await generateProjectsForRegion(
     profile,
     region,
@@ -137,4 +134,26 @@ export async function replaceCompletedProject(
     undefined,
   );
   return created[created.length - 1] ?? null;
+}
+
+/**
+ * Fetches `count` brand-new AI-generated projects for a region on demand,
+ * appended to whatever is already active (no top-up/cap semantics).
+ */
+export async function fetchProjectsOnDemand(
+  profile: OnboardingProfile,
+  region: RegionCode,
+  count: number,
+): Promise<MarketProject[]> {
+  const existing = await getProjectsByRegion(region, "active");
+  const excludeTitles = existing.map((p) => p.title);
+
+  const newProjects = await fetchProjectsFromAi(profile, region, count, excludeTitles);
+
+  const startOrder = existing.length;
+  for (let i = 0; i < newProjects.length; i++) {
+    await saveProject(newProjects[i], startOrder + i);
+  }
+
+  return newProjects;
 }
