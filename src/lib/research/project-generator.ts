@@ -145,32 +145,48 @@ export async function replaceCompletedProject(
   return enriched[enriched.length - 1] ?? created[created.length - 1] ?? null;
 }
 
+/** Hard ceiling on how many projects can be fetched in a single on-demand request. */
+export const MAX_ON_DEMAND_FETCH_COUNT = 10;
+
+export interface OnDemandFetchProgress {
+  completed: number;
+  total: number;
+  title: string;
+}
+
 /**
  * Fetches `count` brand-new AI-generated projects for a region on demand,
- * appended to whatever is already active (no top-up/cap semantics), then
- * enriches them with precedents, regional pricing, and sourced citations.
+ * one at a time, appended to whatever is already active (no top-up/cap
+ * semantics). Each project is enriched with precedents, regional pricing,
+ * and sourced citations before `onProgress` is called, so callers can
+ * stream live "N of M done" updates to the UI.
  */
 export async function fetchProjectsOnDemand(
   profile: OnboardingProfile,
   region: RegionCode,
   count: number,
+  onProgress?: (progress: OnDemandFetchProgress) => void,
 ): Promise<MarketProject[]> {
-  const existing = await getProjectsByRegion(region, "active");
-  const excludeTitles = existing.map((p) => p.title);
+  const total = Math.min(count, MAX_ON_DEMAND_FETCH_COUNT);
+  const results: MarketProject[] = [];
 
-  const newProjects = await fetchProjectsFromAi(profile, region, count, excludeTitles);
+  for (let i = 0; i < total; i++) {
+    const existing = await getProjectsByRegion(region, "active");
+    const excludeTitles = [...existing.map((p) => p.title), ...results.map((p) => p.title)];
 
-  const startOrder = existing.length;
-  for (let i = 0; i < newProjects.length; i++) {
-    await saveProject(newProjects[i], startOrder + i);
+    const [drafted] = await fetchProjectsFromAi(profile, region, 1, excludeTitles);
+    if (!drafted) break;
+
+    await saveProject(drafted, existing.length);
+
+    const [enriched] = await enrichProjectsForRegion(profile, region, randomUUID(), [
+      drafted.id,
+    ]);
+    const finalProject = enriched ?? drafted;
+
+    results.push(finalProject);
+    onProgress?.({ completed: i + 1, total, title: finalProject.title });
   }
 
-  if (newProjects.length === 0) return newProjects;
-
-  return enrichProjectsForRegion(
-    profile,
-    region,
-    randomUUID(),
-    newProjects.map((p) => p.id),
-  );
+  return results;
 }
