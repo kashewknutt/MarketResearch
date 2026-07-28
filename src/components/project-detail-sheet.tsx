@@ -23,7 +23,7 @@ import {
   PROJECT_LEAD_PROGRESS_STAGES,
   type ProjectLeadProgressStage,
 } from "@/lib/project-lead-labels";
-import type { LeadRecord, MarketProject, PrecedentRecord } from "@/lib/types/domain";
+import type { LeadRecord, MarketProject, OutreachMessageDraft, PrecedentRecord } from "@/lib/types/domain";
 
 function parsePrecedentMetric(metric?: string): number | null {
   if (!metric) return null;
@@ -270,8 +270,8 @@ export function ProjectDetailSheet({
     router.push(`/leads?project=${project.id}`);
   };
 
-  const copyOpeningMessage = async (leadId: string, index: number, text: string) => {
-    await navigator.clipboard.writeText(text);
+  const copyOpeningMessage = async (leadId: string, index: number, msg: OutreachMessageDraft) => {
+    await navigator.clipboard.writeText(`Subject: ${msg.subject}\n\n${msg.hookLine}\n\n${msg.body}`);
     setCopiedMessageKey(`${leadId}-${index}`);
     setTimeout(() => setCopiedMessageKey(null), 1500);
   };
@@ -578,7 +578,9 @@ export function ProjectDetailSheet({
                                     key={i}
                                     className="rounded-lg bg-slate-50 p-2 text-xs text-slate-700"
                                   >
-                                    <p className="whitespace-pre-wrap">{msg}</p>
+                                    <p className="font-medium text-slate-800">{msg.subject}</p>
+                                    <p className="mt-1 italic text-slate-500">{msg.hookLine}</p>
+                                    <p className="mt-1 whitespace-pre-wrap">{msg.body}</p>
                                     <button
                                       type="button"
                                       onClick={() => void copyOpeningMessage(lead.id, i, msg)}

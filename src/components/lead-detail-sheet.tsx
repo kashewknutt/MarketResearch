@@ -10,31 +10,41 @@ import {
   PROJECT_LEAD_CATEGORY_COLORS,
   PROJECT_LEAD_CATEGORY_LABELS,
 } from "@/lib/project-lead-labels";
-import type { LeadRecord } from "@/lib/types/domain";
+import type { LeadRecord, OutreachMessageDraft } from "@/lib/types/domain";
 
 interface LeadDetailSheetProps {
   lead: LeadRecord | null;
   onClose: () => void;
 }
 
+/** Old records may still hold a plain string from before structured drafts — treat those as not-yet-drafted. */
+function asDraft(value: LeadRecord["outreachMessage"]): OutreachMessageDraft | null {
+  return value && typeof value === "object" ? value : null;
+}
+
+const EMPTY_DRAFT: OutreachMessageDraft = { subject: "", hookLine: "", body: "" };
+
 function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead: LeadRecord) => void }) {
   const [findingContact, setFindingContact] = useState(false);
   const [contactNotFound, setContactNotFound] = useState(false);
   const [manualUrl, setManualUrl] = useState("");
+  const [context, setContext] = useState("");
   const [drafting, setDrafting] = useState(false);
-  const [message, setMessage] = useState(lead.outreachMessage ?? "");
+  const [draft, setDraft] = useState<OutreachMessageDraft>(asDraft(lead.outreachMessage) ?? EMPTY_DRAFT);
   const [copied, setCopied] = useState(false);
   const [confirmingSent, setConfirmingSent] = useState(false);
   const [markingSent, setMarkingSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setMessage(lead.outreachMessage ?? "");
+    setDraft(asDraft(lead.outreachMessage) ?? EMPTY_DRAFT);
     setManualUrl("");
+    setContext("");
     setContactNotFound(false);
     setConfirmingSent(false);
   }, [lead.id]);
 
+  const hasDraft = asDraft(lead.outreachMessage) !== null;
   const profileUrl = lead.contactLinkedInUrl || manualUrl;
 
   async function findContact() {
@@ -58,11 +68,15 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
     setDrafting(true);
     setError(null);
     try {
-      const res = await fetch(`/api/leads/${lead.id}/draft-message`, { method: "POST" });
+      const res = await fetch(`/api/leads/${lead.id}/draft-message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ context: context.trim() || undefined }),
+      });
       if (!res.ok) throw new Error("Could not draft a message");
       const { lead: updated } = await res.json();
       onUpdate(updated);
-      setMessage(updated.outreachMessage ?? "");
+      setDraft(asDraft(updated.outreachMessage) ?? EMPTY_DRAFT);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not draft a message");
     } finally {
@@ -71,7 +85,8 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
   }
 
   async function copyMessage() {
-    await navigator.clipboard.writeText(message);
+    const composed = `Subject: ${draft.subject}\n\n${draft.hookLine}\n\n${draft.body}`;
+    await navigator.clipboard.writeText(composed);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -144,14 +159,25 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
         </div>
 
         <div>
-          <div className="flex items-center gap-2">
+          <label className="block text-xs font-medium text-slate-500">
+            Context (optional) — who you&apos;re writing to, recent news, role, etc.
+          </label>
+          <textarea
+            value={context}
+            onChange={(e) => setContext(e.target.value)}
+            rows={2}
+            placeholder="e.g. Writing to their VP of Ops, who recently posted about supply chain delays"
+            className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+          />
+
+          <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
               onClick={draftMessage}
               disabled={drafting}
               className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
             >
-              {drafting ? "Drafting…" : lead.outreachMessage ? "Regenerate" : "Draft message"}
+              {drafting ? "Drafting…" : hasDraft ? "Regenerate" : "Draft message"}
             </button>
             {profileUrl && (
               <a
@@ -165,15 +191,34 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
             )}
           </div>
 
-          {(message || lead.outreachMessage) && (
-            <div className="mt-2">
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                rows={4}
-                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-              />
-              <div className="mt-2 flex items-center gap-2">
+          {hasDraft && (
+            <div className="mt-2 space-y-2">
+              <div>
+                <label className="text-xs font-medium text-slate-500">Subject</label>
+                <input
+                  value={draft.subject}
+                  onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500">Hook line</label>
+                <input
+                  value={draft.hookLine}
+                  onChange={(e) => setDraft((d) => ({ ...d, hookLine: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500">Body</label>
+                <textarea
+                  value={draft.body}
+                  onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={copyMessage}
@@ -240,8 +285,8 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
 
   if (!current) return null;
 
-  const copyOpeningMessage = async (index: number, text: string) => {
-    await navigator.clipboard.writeText(text);
+  const copyOpeningMessage = async (index: number, msg: OutreachMessageDraft) => {
+    await navigator.clipboard.writeText(`Subject: ${msg.subject}\n\n${msg.hookLine}\n\n${msg.body}`);
     setCopiedMessageIndex(index);
     setTimeout(() => setCopiedMessageIndex(null), 1500);
   };
@@ -375,7 +420,9 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
             <div className="mt-3 space-y-3">
               {current.openingMessages.map((msg, i) => (
                 <div key={i} className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
-                  <p className="whitespace-pre-wrap">{msg}</p>
+                  <p className="font-medium text-slate-800">{msg.subject}</p>
+                  <p className="mt-1 italic text-slate-500">{msg.hookLine}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{msg.body}</p>
                   <button
                     type="button"
                     onClick={() => void copyOpeningMessage(i, msg)}

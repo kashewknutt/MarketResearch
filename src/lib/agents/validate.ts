@@ -127,9 +127,15 @@ export const projectCategoryInsightsSchema = z.object({
   insights: z.array(projectCategoryInsightSchema).min(3),
 });
 
+export const outreachMessageDraftSchema = z.object({
+  subject: z.string().min(1),
+  hookLine: z.string().min(1),
+  body: z.string().min(1),
+});
+
 export const projectOpeningMessagesSchema = z.object({
   messages: z
-    .array(z.string())
+    .array(outreachMessageDraftSchema)
     .min(3)
     .transform((items) => items.slice(0, 5)),
 });

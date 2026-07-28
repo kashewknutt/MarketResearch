@@ -381,6 +381,13 @@ export type LeadStatus = "new" | "qualified" | "contacted" | "archived";
 
 export type LeadSource = "discovery" | "project";
 
+export interface OutreachMessageDraft {
+  subject: string;
+  hookLine: string;
+  /** Full message body — starts with the opening salutation, ends with a closing sign-off. */
+  body: string;
+}
+
 export interface LeadRecord {
   id: string;
   company: string;
@@ -400,14 +407,14 @@ export interface LeadRecord {
   contactName?: string;
   contactTitle?: string;
   contactLinkedInUrl?: string;
-  outreachMessage?: string;
+  outreachMessage?: OutreachMessageDraft;
   outreachStatus?: "none" | "contact_found" | "drafted" | "sent";
   outreachUpdatedAt?: string;
   source?: LeadSource;
   projectId?: string;
   projectTitle?: string;
   projectLeadCategory?: ProjectLeadCategory;
-  openingMessages?: string[];
+  openingMessages?: OutreachMessageDraft[];
 }
 
 export interface CompetitorRecord {

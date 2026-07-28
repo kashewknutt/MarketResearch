@@ -1,16 +1,18 @@
 import { randomUUID } from "crypto";
 import { generateStructuredJson } from "@/lib/ai/gemini";
+import { outreachMessageDraftSchema, safeParse } from "@/lib/agents/validate";
 import type { AiCallTrace } from "@/lib/ai/pricing-types";
-import type { LeadRecord, OnboardingProfile } from "@/lib/types/domain";
+import type { LeadRecord, OnboardingProfile, OutreachMessageDraft } from "@/lib/types/domain";
 
 /**
- * Drafts a short, specific, non-salesy outreach message for a single lead, grounded in
+ * Drafts a short, specific, non-salesy LinkedIn outreach message for a single lead, grounded in
  * whatever context was already generated for it during lead discovery — never generic filler.
  */
 export async function draftOutreachMessage(
   profile: OnboardingProfile,
   lead: LeadRecord,
-): Promise<string> {
+  context?: string,
+): Promise<OutreachMessageDraft> {
   const trace: AiCallTrace = {
     operation: "research.lead_outreach_message",
     category: "research",
@@ -18,7 +20,7 @@ export async function draftOutreachMessage(
     researchStage: "leads",
   };
 
-  const result = await generateStructuredJson<{ message: string }>({
+  const result = await generateStructuredJson<OutreachMessageDraft>({
     task: "lead_outreach_message",
     systemInstruction:
       "You write short, specific, non-salesy LinkedIn outreach messages on behalf of a founder reaching out " +
@@ -30,19 +32,20 @@ export async function draftOutreachMessage(
 Lead: ${lead.company}
 Why this lead is a good fit: ${lead.whyFit}
 ${lead.whyPerfect ? `Why this lead is especially strong: ${lead.whyPerfect}\n` : ""}${lead.pitchOutline ? `Pitch angle: ${lead.pitchOutline}\n` : ""}${lead.contactPlan ? `Suggested contact approach: ${lead.contactPlan}\n` : ""}Contact hints: ${lead.contactHints}
-${lead.objections?.length ? `Likely objections to preempt lightly (don't over-address): ${lead.objections.join("; ")}\n` : ""}
-Write a single LinkedIn connection/message note, 2-4 sentences, specific to this lead's situation, ending with a soft, low-pressure call to action (not "let's hop on a call"). No greeting boilerplate like "Hi there" — assume it opens by name at send time (do not include a name placeholder).
+${lead.objections?.length ? `Likely objections to preempt lightly (don't over-address): ${lead.objections.join("; ")}\n` : ""}${context ? `Additional context about this lead/contact: ${context}\n` : ""}
+Write a LinkedIn InMail-style message with three parts:
+- "subject": a short, specific subject line (not generic, no clickbait).
+- "hookLine": a single attention-grabbing opening sentence distinct from the greeting, specific to this lead's situation.
+- "body": the full message (2-4 sentences), starting with an opening salutation (assume it opens by first name at send time — do not include a name placeholder, just start naturally e.g. "Hi," is fine to omit if body flows from the hook) and ending with a short, low-pressure closing sign-off (not "let's hop on a call"). No greeting boilerplate like "Hi there".
 
-Return JSON: { "message": string }`,
+Return JSON: { "subject": string, "hookLine": string, "body": string }`,
     parse: (raw) => {
-      const obj = raw as { message?: unknown };
-      if (typeof obj.message !== "string" || !obj.message.trim()) {
-        throw new Error("AI response missing 'message' string");
-      }
-      return { message: obj.message.trim() };
+      const parsed = safeParse(outreachMessageDraftSchema, raw);
+      if (!parsed) throw new Error("AI response missing subject/hookLine/body");
+      return parsed;
     },
     trace,
   });
 
-  return result.data.message;
+  return result.data;
 }

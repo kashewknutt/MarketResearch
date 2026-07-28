@@ -20,6 +20,7 @@ import type {
   LeadRecord,
   MarketProject,
   OnboardingProfile,
+  OutreachMessageDraft,
   ProjectLeadCategory,
   ProjectLeadContext,
 } from "@/lib/types/domain";
@@ -222,7 +223,7 @@ async function generateOpeningMessages(
   lead: LeadRecord,
   categoryInsight: ProjectLeadContext["categoryInsights"][number] | undefined,
   trace: AiCallTrace,
-): Promise<string[]> {
+): Promise<OutreachMessageDraft[]> {
   const result = await generateStructuredJson({
     task: "project_lead_opening_messages",
     systemInstruction:
@@ -236,9 +237,12 @@ Lead: ${lead.company}
 Category: ${lead.projectLeadCategory ?? "unknown"}
 Why fit: ${lead.whyFit}
 ${lead.pitchOutline ? `Pitch angle: ${lead.pitchOutline}\n` : ""}${categoryInsight ? `CEO mindset: ${categoryInsight.ceoThinking}\nTop problems: ${categoryInsight.topProblems.join("; ")}\nService mapping: ${categoryInsight.serviceMapping}\n` : ""}
-Write 5 distinct opening messages (2-4 sentences each), specific to this lead and project. Soft CTA, no "Hi there" boilerplate.
+Write 5 distinct LinkedIn InMail-style opening messages, specific to this lead and project. Each has three parts:
+- "subject": a short, specific subject line (not generic, no clickbait).
+- "hookLine": a single attention-grabbing opening sentence distinct from the greeting.
+- "body": the full message (2-4 sentences), opening with a salutation and ending with a soft, low-pressure sign-off. No "Hi there" boilerplate.
 
-Return JSON: { "messages": string[5] }`,
+Return JSON: { "messages": [{ "subject": string, "hookLine": string, "body": string }] (exactly 5) }`,
     parse: (raw) => {
       const parsed = safeParse(projectOpeningMessagesSchema, raw);
       if (!parsed) throw new Error("Invalid opening messages response");

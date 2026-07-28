@@ -3,8 +3,12 @@ import { getAllLeads, saveLeads } from "@/lib/store/leads";
 import { getProfile } from "@/lib/store/settings";
 import { draftOutreachMessage } from "@/lib/research/stages/lead-outreach";
 
+function requiredString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
@@ -19,7 +23,10 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const message = await draftOutreachMessage(profile, lead);
+  const body = await request.json().catch(() => ({}));
+  const context = requiredString(body.context) ?? undefined;
+
+  const message = await draftOutreachMessage(profile, lead, context);
 
   const updated = {
     ...lead,
