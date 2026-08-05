@@ -16,19 +16,21 @@ export async function POST(request: Request) {
   const city = requiredString(body.city);
   const region = requiredString(body.region);
   const keyword = requiredString(body.keyword);
+  const campaignContext = requiredString(body.campaignContext);
   const count = Number(body.count);
 
   if (
     !city ||
     !region ||
     !keyword ||
+    !campaignContext ||
     !Number.isFinite(count) ||
     count < 1 ||
     count > MAX_COLD_CALL_FETCH_COUNT
   ) {
     return Response.json(
       {
-        error: `city, region, keyword, and a count between 1 and ${MAX_COLD_CALL_FETCH_COUNT} are required`,
+        error: `city, region, keyword, campaignContext, and a count between 1 and ${MAX_COLD_CALL_FETCH_COUNT} are required`,
       },
       { status: 400 },
     );
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
       try {
         const leads = await discoverColdCallLeads(
           profile,
-          { city, region, keyword, count: Math.floor(count) },
+          { city, region, keyword, campaignContext, count: Math.floor(count) },
           (progress) => send({ type: "progress", ...progress }),
         );
         send({ type: "complete", leads });

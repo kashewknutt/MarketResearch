@@ -17,6 +17,8 @@ export interface ColdCallFetchParams {
   region: RegionCode;
   keyword: string;
   count: number;
+  /** What this batch of leads is for — a campaign, offer, or target description that grounds the pitch narrative. */
+  campaignContext: string;
 }
 
 export interface ColdCallProgress {
@@ -35,6 +37,7 @@ const narrativeSchema = z.object({
 async function synthesizeNarrative(
   profile: OnboardingProfile,
   business: { name: string; address?: string; phone: string; businessStatus?: string },
+  campaignContext: string,
   trace: AiCallTrace,
 ) {
   const result = await generateStructuredJson({
@@ -44,13 +47,15 @@ async function synthesizeNarrative(
       "business. Ground everything in the real facts given — never invent details. JSON only.",
     userPrompt: `Seller: ${profile.businessName} (${profile.serviceDomain}), targeting ${profile.targetAudience}.
 
+Campaign / reason for this call list (what the seller told us they're calling about): ${campaignContext}
+
 Business found via Google Maps (has a listed phone number, no website on file):
 Name: ${business.name}
 ${business.address ? `Address: ${business.address}\n` : ""}Phone: ${business.phone}
 ${business.businessStatus ? `Status: ${business.businessStatus}\n` : ""}
-Write:
-- "whyFit": why this business (having no website) is a plausible fit for the seller's services.
-- "pitchOutline": a short outline of what to pitch on the call.
+Write, specific to the campaign above (not generic):
+- "whyFit": why this business (having no website) is a plausible fit for this specific campaign/offer.
+- "pitchOutline": a short outline of what to pitch on the call, tailored to the campaign.
 - "contactHints": practical advice for the call itself (e.g. who to ask for — there's no listed decision-maker, only a business phone line).
 - "signals": 1-3 short signals supporting the fit (based only on the facts given, e.g. "no website listed despite active Google Business Profile").
 
@@ -116,6 +121,7 @@ export async function discoverColdCallLeads(
         phone: place.phone,
         businessStatus: place.businessStatus,
       },
+      params.campaignContext,
       trace,
     );
 
@@ -140,6 +146,7 @@ export async function discoverColdCallLeads(
       contactHints: narrative.contactHints,
       whyFit: narrative.whyFit,
       pitchOutline: narrative.pitchOutline,
+      contactPlan: `Campaign: ${params.campaignContext}`,
       sources,
       status: "new",
       provenance: createProvenance("search", sources, 0.8),

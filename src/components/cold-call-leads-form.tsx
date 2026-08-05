@@ -24,6 +24,7 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
   const region = regionChoice === CUSTOM_REGION_VALUE ? customRegion : regionChoice;
   const [city, setCity] = useState("");
   const [keyword, setKeyword] = useState("");
+  const [campaignContext, setCampaignContext] = useState("");
   const [count, setCount] = useState("5");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +35,7 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
     region.trim() &&
     city.trim() &&
     keyword.trim() &&
+    campaignContext.trim() &&
     Number.isFinite(numericCount) &&
     numericCount >= 1 &&
     numericCount <= MAX_COLD_CALL_FETCH_COUNT;
@@ -51,6 +53,7 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
           region,
           city: city.trim(),
           keyword: keyword.trim(),
+          campaignContext: campaignContext.trim(),
           count: numericCount,
         }),
       });
@@ -175,6 +178,19 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="e.g. digital marketing agencies"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-500">
+                  Campaign / target — what are these numbers for?
+                </label>
+                <textarea
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  value={campaignContext}
+                  onChange={(e) => setCampaignContext(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Cold-calling local retailers without a website to pitch our starter website + Google Business Profile setup package"
                 />
               </div>
 
