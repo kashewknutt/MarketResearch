@@ -7,6 +7,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
 import { NewLeadForm } from "@/components/new-lead-form";
+import { ColdCallLeadsForm } from "@/components/cold-call-leads-form";
 import { LikeCell } from "@/components/like-cell";
 import { PageLoading } from "@/components/ui/page-loading";
 import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
@@ -55,6 +56,13 @@ function SourceBadge({ lead }: { lead: LeadRecord }) {
       </div>
     );
   }
+  if (source === "cold_call") {
+    return (
+      <span className="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+        Cold call
+      </span>
+    );
+  }
   return (
     <span className="inline-block rounded-full bg-slate-50 px-2 py-0.5 text-xs text-slate-600">
       Discovery
@@ -85,6 +93,8 @@ function LeadsPageInner() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
   const [showNewLead, setShowNewLead] = useState(false);
+  const [showColdCall, setShowColdCall] = useState(false);
+  const [profileRegions, setProfileRegions] = useState<string[]>([]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -115,6 +125,13 @@ function LeadsPageInner() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((d) => setProfileRegions(d?.profile?.regions ?? []))
+      .catch(() => setProfileRegions([]));
+  }, []);
 
   useEffect(() => {
     if (projectId) {
@@ -205,13 +222,22 @@ function LeadsPageInner() {
               from a project.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setShowNewLead(true)}
-            className="shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
-          >
-            New lead
-          </button>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => setShowColdCall(true)}
+              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700"
+            >
+              Find cold-call leads
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNewLead(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              New lead
+            </button>
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           {(
@@ -219,6 +245,7 @@ function LeadsPageInner() {
               ["all", "All"],
               ["discovery", "Discovery"],
               ["project", "Project-linked"],
+              ["cold_call", "Cold call"],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -307,6 +334,17 @@ function LeadsPageInner() {
             setTotal((t) => t + 1);
             setShowNewLead(false);
             setSelected(lead);
+          }}
+        />
+      )}
+      {showColdCall && (
+        <ColdCallLeadsForm
+          regions={profileRegions}
+          onClose={() => setShowColdCall(false)}
+          onFetched={(newLeads) => {
+            setLeads((list) => [...newLeads, ...list]);
+            setTotal((t) => t + newLeads.length);
+            setShowColdCall(false);
           }}
         />
       )}

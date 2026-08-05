@@ -10,11 +10,105 @@ import {
   PROJECT_LEAD_CATEGORY_COLORS,
   PROJECT_LEAD_CATEGORY_LABELS,
 } from "@/lib/project-lead-labels";
-import type { LeadRecord, OutreachMessageDraft } from "@/lib/types/domain";
+import type { CallOutcome, LeadCallLog, LeadRecord, OutreachMessageDraft } from "@/lib/types/domain";
 
 interface LeadDetailSheetProps {
   lead: LeadRecord | null;
   onClose: () => void;
+}
+
+const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
+  no_answer: "No answer",
+  voicemail: "Voicemail",
+  not_interested: "Not interested",
+  interested: "Interested",
+  callback_later: "Callback later",
+  wrong_number: "Wrong number",
+};
+
+function CallLogSection({ leadId }: { leadId: string }) {
+  const [logs, setLogs] = useState<LeadCallLog[]>([]);
+  const [outcome, setOutcome] = useState<CallOutcome>("no_answer");
+  const [notes, setNotes] = useState("");
+  const [logging, setLogging] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    setLogs([]);
+    setNotes("");
+    setLoaded(false);
+    fetch(`/api/leads/${leadId}/call-logs`)
+      .then((r) => r.json())
+      .then((d) => setLogs(d.logs ?? []))
+      .finally(() => setLoaded(true));
+  }, [leadId]);
+
+  async function logCall() {
+    setLogging(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/call-logs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ outcome, notes: notes.trim() || undefined }),
+      });
+      if (res.ok) {
+        const { logs: updated } = await res.json();
+        setLogs(updated ?? []);
+        setNotes("");
+      }
+    } finally {
+      setLogging(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-100 p-4">
+      <p className="text-sm font-medium text-slate-800">Call log</p>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div>
+          <label className="text-xs font-medium text-slate-500">Outcome</label>
+          <select
+            value={outcome}
+            onChange={(e) => setOutcome(e.target.value as CallOutcome)}
+            className="mt-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+          >
+            {Object.entries(CALL_OUTCOME_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <input
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes (optional)"
+          className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+        />
+        <button
+          type="button"
+          onClick={logCall}
+          disabled={logging}
+          className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+        >
+          {logging ? "Logging…" : "Log call"}
+        </button>
+      </div>
+
+      {loaded && logs.length > 0 && (
+        <ul className="mt-3 space-y-2">
+          {logs.map((log) => (
+            <li key={log.id} className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
+              <span className="font-medium text-slate-800">{CALL_OUTCOME_LABELS[log.outcome]}</span>
+              {" · "}
+              {new Date(log.calledAt).toLocaleString()}
+              {log.notes && <p className="mt-1 whitespace-pre-wrap">{log.notes}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 /** Old records may still hold a plain string from before structured drafts — treat those as not-yet-drafted. */
@@ -321,6 +415,11 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
               Project lead
             </span>
           )}
+          {current.source === "cold_call" && (
+            <span className="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+              Cold call
+            </span>
+          )}
           {current.projectLeadCategory && (
             <span
               className={`inline-block rounded-full px-2 py-0.5 text-xs ${PROJECT_LEAD_CATEGORY_COLORS[current.projectLeadCategory]}`}
@@ -329,6 +428,22 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
             </span>
           )}
         </div>
+
+        {(current.companyPhone || current.companyAddress) && (
+          <section className="rounded-lg border border-slate-100 p-3 text-xs text-slate-700">
+            {current.companyPhone && (
+              <p>
+                <a href={`tel:${current.companyPhone}`} className="font-medium text-violet-700 hover:underline">
+                  {current.companyPhone}
+                </a>
+              </p>
+            )}
+            {current.companyAddress && <p className="mt-1 text-slate-500">{current.companyAddress}</p>}
+            {!current.companyWebsite && current.source === "cold_call" && (
+              <p className="mt-1 text-slate-400">No website found — cold-call candidate.</p>
+            )}
+          </section>
+        )}
 
         {current.projectTitle && current.projectId && (
           <section className="rounded-lg border border-slate-100 p-3">
@@ -437,6 +552,8 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
         )}
 
         <OutreachSection lead={current} onUpdate={setCurrent} />
+
+        <CallLogSection leadId={current.id} />
 
         <CommentThread entityType="lead" entityId={current.id} />
       </div>

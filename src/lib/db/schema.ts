@@ -148,6 +148,16 @@ export const leads = pgTable("leads", {
   createdAt: text("created_at").notNull(),
 });
 
+export const leadCallLogs = pgTable("lead_call_logs", {
+  id: text("id").primaryKey(),
+  orgId: uuid("org_id").notNull(),
+  leadId: text("lead_id").notNull(),
+  calledAt: text("called_at").notNull(),
+  outcome: text("outcome").notNull(),
+  notes: text("notes"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const researchArtifacts = pgTable("research_artifacts", {
   id: text("id").primaryKey(),
   orgId: uuid("org_id").notNull(),

@@ -379,7 +379,24 @@ export interface MarketingSocialSnapshot {
 
 export type LeadStatus = "new" | "qualified" | "contacted" | "archived";
 
-export type LeadSource = "discovery" | "project";
+export type LeadSource = "discovery" | "project" | "cold_call";
+
+export type CallOutcome =
+  | "no_answer"
+  | "voicemail"
+  | "not_interested"
+  | "interested"
+  | "callback_later"
+  | "wrong_number";
+
+export interface LeadCallLog {
+  id: string;
+  leadId: string;
+  calledAt: string;
+  outcome: CallOutcome;
+  notes?: string;
+  createdAt: string;
+}
 
 export interface OutreachMessageDraft {
   subject: string;
@@ -407,6 +424,13 @@ export interface LeadRecord {
   contactName?: string;
   contactTitle?: string;
   contactLinkedInUrl?: string;
+  /** Business phone line from Google Places — not a specific person's number. */
+  companyPhone?: string;
+  companyAddress?: string;
+  /** Only set in the rare case a cold-call candidate turns out to have a website after all. */
+  companyWebsite?: string;
+  googlePlaceId?: string;
+  businessStatus?: string;
   outreachMessage?: OutreachMessageDraft;
   outreachStatus?: "none" | "contact_found" | "drafted" | "sent";
   outreachUpdatedAt?: string;
