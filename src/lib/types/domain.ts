@@ -414,6 +414,8 @@ export interface LeadRecord {
   contactHints: string;
   whyFit: string;
   whyPerfect?: string;
+  /** A specific, concrete problem this lead likely faces that the seller's domain/services could plausibly solve. */
+  painPoint?: string;
   pitchOutline?: string;
   contactPlan?: string;
   objections?: string[];

@@ -29,6 +29,7 @@ export interface ColdCallProgress {
 
 const narrativeSchema = z.object({
   whyFit: z.string().min(1),
+  painPoint: z.string().min(1),
   pitchOutline: z.string().min(1),
   contactHints: z.string().min(1),
   signals: z.array(z.string()).min(1),
@@ -55,11 +56,12 @@ ${business.address ? `Address: ${business.address}\n` : ""}Phone: ${business.pho
 ${business.businessStatus ? `Status: ${business.businessStatus}\n` : ""}
 Write, specific to the campaign above (not generic):
 - "whyFit": why this business (having no website) is a plausible fit for this specific campaign/offer.
-- "pitchOutline": a short outline of what to pitch on the call, tailored to the campaign.
+- "painPoint": the single biggest, most concrete problem this specific business likely faces (infer from its category, having no website, and its status/address — not invented specifics like names or numbers) that falls squarely within the seller's domain (${profile.serviceDomain}) to solve. Be specific to this business, not a generic industry statement.
+- "pitchOutline": a short outline of what to pitch on the call, opening from that pain point and tailored to the campaign.
 - "contactHints": practical advice for the call itself (e.g. who to ask for — there's no listed decision-maker, only a business phone line).
 - "signals": 1-3 short signals supporting the fit (based only on the facts given, e.g. "no website listed despite active Google Business Profile").
 
-Return JSON: { "whyFit": string, "pitchOutline": string, "contactHints": string, "signals": string[] }`,
+Return JSON: { "whyFit": string, "painPoint": string, "pitchOutline": string, "contactHints": string, "signals": string[] }`,
     parse: (raw) => {
       const parsed = safeParse(narrativeSchema, raw);
       if (!parsed) throw new Error("Invalid cold-call narrative response");
@@ -145,6 +147,7 @@ export async function discoverColdCallLeads(
       signals: [...narrative.signals, ...(enrichment?.signals ?? [])],
       contactHints: narrative.contactHints,
       whyFit: narrative.whyFit,
+      painPoint: narrative.painPoint,
       pitchOutline: narrative.pitchOutline,
       contactPlan: `Campaign: ${params.campaignContext}`,
       sources,

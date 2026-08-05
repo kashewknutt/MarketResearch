@@ -480,6 +480,13 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
           </section>
         )}
 
+        {current.painPoint && (
+          <section className="rounded-lg bg-amber-50/60 p-4">
+            <p className="text-sm font-medium text-slate-800">Likely pain point</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-700">{current.painPoint}</p>
+          </section>
+        )}
+
         {current.contactPlan && (
           <section>
             <p className="text-sm font-medium text-slate-800">How to contact</p>
