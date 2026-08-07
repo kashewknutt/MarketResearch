@@ -80,6 +80,10 @@ export interface GooglePlaceResult {
   phone: string;
   businessStatus?: string;
   googleMapsUri?: string;
+  rating?: number;
+  userRatingCount?: number;
+  /** Human-readable weekly hours (e.g. "Monday: 9:00 AM – 6:00 PM"), joined with "; ". */
+  openingHours?: string;
 }
 
 interface RawPlace {
@@ -91,6 +95,9 @@ interface RawPlace {
   websiteUri?: string;
   businessStatus?: string;
   googleMapsUri?: string;
+  rating?: number;
+  userRatingCount?: number;
+  regularOpeningHours?: { weekdayDescriptions?: string[] };
 }
 
 const FIELD_MASK = [
@@ -102,7 +109,13 @@ const FIELD_MASK = [
   "places.websiteUri",
   "places.businessStatus",
   "places.googleMapsUri",
+  "places.rating",
+  "places.userRatingCount",
+  "places.regularOpeningHours",
 ].join(",");
+
+/** Places still marked as closed shouldn't be surfaced as cold-call candidates — a dead number wastes a call. */
+const CLOSED_STATUSES = new Set(["CLOSED_TEMPORARILY", "CLOSED_PERMANENTLY"]);
 
 /**
  * Searches Google Places (New) Text Search for businesses matching `query`, returning only
@@ -160,11 +173,16 @@ export async function searchGooglePlacesWithoutWebsite(
   const places = body.places ?? [];
   console.log(`[google-places] raw results: ${places.length}`);
 
+  let closedSkipped = 0;
   const filtered = places
     .map((p): GooglePlaceResult | null => {
       const phone = p.internationalPhoneNumber ?? p.nationalPhoneNumber;
       const displayName = p.displayName?.text;
       if (!p.id || !displayName || !phone || p.websiteUri) return null;
+      if (p.businessStatus && CLOSED_STATUSES.has(p.businessStatus)) {
+        closedSkipped++;
+        return null;
+      }
       return {
         placeId: p.id,
         displayName,
@@ -172,13 +190,19 @@ export async function searchGooglePlacesWithoutWebsite(
         phone,
         businessStatus: p.businessStatus,
         googleMapsUri: p.googleMapsUri,
+        rating: p.rating,
+        userRatingCount: p.userRatingCount,
+        openingHours: p.regularOpeningHours?.weekdayDescriptions?.length
+          ? p.regularOpeningHours.weekdayDescriptions.join("; ")
+          : undefined,
       };
     })
     .filter((p): p is GooglePlaceResult => p !== null)
     .slice(0, maxResults);
 
   console.log(
-    `[google-places] ${filtered.length} of ${places.length} raw result(s) qualify (has phone, no website)`,
+    `[google-places] ${filtered.length} of ${places.length} raw result(s) qualify (has phone, no website, not closed)` +
+      (closedSkipped > 0 ? ` — ${closedSkipped} skipped for being closed` : ""),
   );
 
   return filtered;

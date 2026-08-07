@@ -4,7 +4,7 @@ import { generateStructuredJson } from "@/lib/ai/gemini";
 import type { AiCallTrace } from "@/lib/ai/pricing-types";
 import { safeParse } from "@/lib/agents/validate";
 import { createProvenance } from "@/lib/db/provenance";
-import { searchGooglePlacesWithoutWebsite } from "@/lib/integrations/google-places";
+import { searchGooglePlacesWithoutWebsite, type GooglePlaceResult } from "@/lib/integrations/google-places";
 import { findDecisionMakerContact } from "@/lib/integrations/linkedin-people-search";
 import { enrichColdCallLead } from "@/lib/integrations/perplexity";
 import { getAllLeads, newLeadId, normalizeCompanyName, saveLeads } from "@/lib/store/leads";
@@ -103,9 +103,33 @@ const narrativeSchema = z.object({
   signals: z.array(z.string()).min(1),
 });
 
+/**
+ * Baseline 55 (real, operational, no-website business) adjusted by how the business's Google
+ * rating deviates from a neutral 3.0 (±20 max) and a log-scaled bonus for review volume (more
+ * reviews = a more established, findable business) — not a measure of buying intent (we have no
+ * signal for that here), just a rough "how real/reachable is this business" proxy. Replaces the
+ * previous flat fitScore=60 for every cold-call lead.
+ */
+function computeFitScore(rating: number | undefined, userRatingCount: number | undefined): number {
+  let score = 55;
+  if (rating != null) score += Math.round((rating - 3) * 10);
+  if (userRatingCount != null && userRatingCount > 0) {
+    score += Math.min(15, Math.round(Math.log10(userRatingCount + 1) * 6));
+  }
+  return Math.max(30, Math.min(90, score));
+}
+
 async function synthesizeNarrative(
   profile: OnboardingProfile,
-  business: { name: string; address?: string; phone: string; businessStatus?: string },
+  business: {
+    name: string;
+    address?: string;
+    phone: string;
+    businessStatus?: string;
+    rating?: number;
+    userRatingCount?: number;
+    openingHours?: string;
+  },
   campaignContext: string,
   trace: AiCallTrace,
 ) {
@@ -121,12 +145,12 @@ Campaign / reason for this call list (what the seller told us they're calling ab
 Business found via Google Maps (has a listed phone number, no website on file):
 Name: ${business.name}
 ${business.address ? `Address: ${business.address}\n` : ""}Phone: ${business.phone}
-${business.businessStatus ? `Status: ${business.businessStatus}\n` : ""}
+${business.businessStatus ? `Status: ${business.businessStatus}\n` : ""}${business.rating != null ? `Google rating: ${business.rating} (${business.userRatingCount ?? 0} reviews)\n` : ""}${business.openingHours ? `Hours: ${business.openingHours}\n` : ""}
 Write, specific to the campaign above (not generic):
 - "whyFit": why this business (having no website) is a plausible fit for this specific campaign/offer.
-- "painPoint": the single biggest, most concrete problem this specific business likely faces (infer from its category, having no website, and its status/address — not invented specifics like names or numbers) that falls squarely within the seller's domain (${profile.serviceDomain}) to solve. Be specific to this business, not a generic industry statement.
+- "painPoint": the single biggest, most concrete problem this specific business likely faces (infer from its category, having no website, its rating/review volume if given, and its status/address — not invented specifics like names or numbers) that falls squarely within the seller's domain (${profile.serviceDomain}) to solve. Be specific to this business, not a generic industry statement.
 - "pitchOutline": a short outline of what to pitch on the call, opening from that pain point and tailored to the campaign.
-- "contactHints": practical advice for the call itself (e.g. who to ask for — there's no listed decision-maker, only a business phone line).
+- "contactHints": practical advice for the call itself (e.g. who to ask for — there's no listed decision-maker, only a business phone line; when hours are given, suggest a good time to call).
 - "signals": 1-3 short signals supporting the fit (based only on the facts given, e.g. "no website listed despite active Google Business Profile").
 
 Return JSON: { "whyFit": string, "painPoint": string, "pitchOutline": string, "contactHints": string, "signals": string[] }`,
@@ -140,6 +164,111 @@ Return JSON: { "whyFit": string, "painPoint": string, "pitchOutline": string, "c
 
   return result.data;
 }
+
+/**
+ * Runs narrative synthesis (Gemini, required), Perplexity enrichment, and the LinkedIn
+ * decision-maker lookup concurrently for one place, builds the LeadRecord, and saves it.
+ * These three calls are independent of each other, so running them in parallel cuts
+ * per-lead critical-path time to whichever is slowest instead of their sum.
+ */
+async function buildAndSaveLead(
+  profile: OnboardingProfile,
+  place: GooglePlaceResult,
+  category: string,
+  region: RegionCode,
+  campaignContext: string,
+): Promise<LeadRecord> {
+  console.log(
+    `[cold-call] processing "${place.displayName}" (category="${category}") — phone=${place.phone} address=${place.formattedAddress ?? "n/a"}`,
+  );
+
+  const trace: AiCallTrace = {
+    operation: "research.cold_call_lead_narrative",
+    category: "research",
+    correlationId: randomUUID(),
+    region,
+    researchStage: "leads",
+  };
+
+  const stepStarted = Date.now();
+  let narrative: Awaited<ReturnType<typeof synthesizeNarrative>>;
+  let enrichment: Awaited<ReturnType<typeof enrichColdCallLead>>;
+  let contact: Awaited<ReturnType<typeof findDecisionMakerContact>>;
+  try {
+    [narrative, enrichment, contact] = await Promise.all([
+      synthesizeNarrative(
+        profile,
+        {
+          name: place.displayName,
+          address: place.formattedAddress,
+          phone: place.phone,
+          businessStatus: place.businessStatus,
+          rating: place.rating,
+          userRatingCount: place.userRatingCount,
+          openingHours: place.openingHours,
+        },
+        campaignContext,
+        trace,
+      ),
+      enrichColdCallLead(profile, { name: place.displayName, address: place.formattedAddress }),
+      // Google Places only gives a business phone line, not a person — best-effort search
+      // for a real, named decision-maker so there's someone to ask for on the call.
+      // Degrades to null if APIFY_API_TOKEN is unset or nothing found; never throws.
+      findDecisionMakerContact(place.displayName),
+    ]);
+  } catch (err) {
+    console.error(`[cold-call] Gemini narrative synthesis failed for "${place.displayName}":`, err);
+    throw err;
+  }
+  console.log(
+    `[cold-call] per-lead lookups done for "${place.displayName}" in ${Date.now() - stepStarted}ms — ` +
+      `narrative ok, Perplexity ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}, ` +
+      `decision-maker ${contact ? `${contact.name} (${contact.title})` : "not found/unavailable"}`,
+  );
+
+  const sources: Citation[] = [
+    ...(place.googleMapsUri ? [{ title: "Google Maps listing", uri: place.googleMapsUri }] : []),
+    ...(enrichment?.citations ?? []),
+  ];
+
+  const lead: LeadRecord = {
+    id: newLeadId(),
+    company: place.displayName,
+    region,
+    fitScore: computeFitScore(place.rating, place.userRatingCount),
+    signals: [...narrative.signals, ...(enrichment?.signals ?? [])],
+    contactHints: contact
+      ? `Ask for ${contact.name}${contact.title ? ` (${contact.title})` : ""}. ${narrative.contactHints}`
+      : narrative.contactHints,
+    whyFit: narrative.whyFit,
+    painPoint: narrative.painPoint,
+    pitchOutline: narrative.pitchOutline,
+    contactPlan: `Campaign: ${campaignContext}`,
+    sources,
+    status: "new",
+    provenance: createProvenance("search", sources, 0.8),
+    createdAt: new Date().toISOString(),
+    source: "cold_call",
+    companyPhone: place.phone,
+    companyAddress: place.formattedAddress,
+    googlePlaceId: place.placeId,
+    businessStatus: place.businessStatus,
+    googleRating: place.rating,
+    googleReviewCount: place.userRatingCount,
+    openingHours: place.openingHours,
+    contactName: contact?.name,
+    contactTitle: contact?.title,
+    contactLinkedInUrl: contact?.profileUrl,
+    outreachStatus: contact ? "contact_found" : undefined,
+  };
+
+  await saveLeads([lead]);
+  console.log(`[cold-call] saved lead "${lead.company}" (${lead.id})`);
+  return lead;
+}
+
+/** How many places to process concurrently within a category — bounds Apify/Gemini/Perplexity fan-out. */
+const PLACE_BATCH_SIZE = 3;
 
 /**
  * Finds real local businesses with a Google Maps listing (phone number) but no website —
@@ -197,9 +326,11 @@ export async function discoverColdCallLeads(
       continue;
     }
 
+    // Dedup synchronously up front (Set mutation must happen before any async work starts,
+    // so two places in the same batch can never both slip through as "new").
+    const candidates: GooglePlaceResult[] = [];
     for (const place of places) {
-      if (results.length >= total) break;
-
+      if (results.length + candidates.length >= total) break;
       const normalized = normalizeCompanyName(place.displayName);
       if (knownCompanyNames.has(normalized) || knownPlaceIds.has(place.placeId)) {
         skippedDuplicates++;
@@ -208,99 +339,24 @@ export async function discoverColdCallLeads(
       }
       knownCompanyNames.add(normalized);
       knownPlaceIds.add(place.placeId);
+      candidates.push(place);
+    }
 
-      console.log(
-        `[cold-call] processing "${place.displayName}" (category="${category}") — phone=${place.phone} address=${place.formattedAddress ?? "n/a"}`,
+    for (let i = 0; i < candidates.length; i += PLACE_BATCH_SIZE) {
+      if (results.length >= total) break;
+      const batch = candidates.slice(i, i + PLACE_BATCH_SIZE).slice(0, total - results.length);
+
+      const leads = await Promise.all(
+        batch.map((place) =>
+          buildAndSaveLead(profile, place, category, params.region, params.campaignContext),
+        ),
       );
 
-      const trace: AiCallTrace = {
-        operation: "research.cold_call_lead_narrative",
-        category: "research",
-        correlationId: randomUUID(),
-        region: params.region,
-        researchStage: "leads",
-      };
-
-      // Narrative synthesis (Gemini, required), Perplexity enrichment, and the LinkedIn
-      // decision-maker lookup are all independent of each other — run them concurrently
-      // instead of sequentially. Sequential per-lead latency (12-16s narrative + 2-3s
-      // Perplexity + several seconds for Apify) was the actual cause of the pipeline only
-      // getting through 1-2 leads before the serverless function's execution time ran out;
-      // this cuts per-lead critical-path time down to whichever of the three is slowest.
-      const stepStarted = Date.now();
-      let narrative: Awaited<ReturnType<typeof synthesizeNarrative>>;
-      let enrichment: Awaited<ReturnType<typeof enrichColdCallLead>>;
-      let contact: Awaited<ReturnType<typeof findDecisionMakerContact>>;
-      try {
-        [narrative, enrichment, contact] = await Promise.all([
-          synthesizeNarrative(
-            profile,
-            {
-              name: place.displayName,
-              address: place.formattedAddress,
-              phone: place.phone,
-              businessStatus: place.businessStatus,
-            },
-            params.campaignContext,
-            trace,
-          ),
-          enrichColdCallLead(profile, { name: place.displayName, address: place.formattedAddress }),
-          // Google Places only gives a business phone line, not a person — best-effort search
-          // for a real, named decision-maker so there's someone to ask for on the call.
-          // Degrades to null if APIFY_API_TOKEN is unset or nothing found; never throws.
-          findDecisionMakerContact(place.displayName),
-        ]);
-      } catch (err) {
-        console.error(`[cold-call] Gemini narrative synthesis failed for "${place.displayName}":`, err);
-        throw err;
+      for (const lead of leads) {
+        results.push(lead);
+        console.log(`[cold-call] progress ${results.length}/${total} — "${lead.company}"`);
+        onProgress?.({ completed: results.length, total, title: lead.company });
       }
-      console.log(
-        `[cold-call] per-lead lookups done for "${place.displayName}" in ${Date.now() - stepStarted}ms — ` +
-          `narrative ok, Perplexity ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}, ` +
-          `decision-maker ${contact ? `${contact.name} (${contact.title})` : "not found/unavailable"}`,
-      );
-
-      const sources: Citation[] = [
-        ...(place.googleMapsUri
-          ? [{ title: "Google Maps listing", uri: place.googleMapsUri }]
-          : []),
-        ...(enrichment?.citations ?? []),
-      ];
-
-      const lead: LeadRecord = {
-        id: newLeadId(),
-        company: place.displayName,
-        region: params.region,
-        fitScore: 60,
-        signals: [...narrative.signals, ...(enrichment?.signals ?? [])],
-        contactHints: contact
-          ? `Ask for ${contact.name}${contact.title ? ` (${contact.title})` : ""}. ${narrative.contactHints}`
-          : narrative.contactHints,
-        whyFit: narrative.whyFit,
-        painPoint: narrative.painPoint,
-        pitchOutline: narrative.pitchOutline,
-        contactPlan: `Campaign: ${params.campaignContext}`,
-        sources,
-        status: "new",
-        provenance: createProvenance("search", sources, 0.8),
-        createdAt: new Date().toISOString(),
-        source: "cold_call",
-        companyPhone: place.phone,
-        companyAddress: place.formattedAddress,
-        googlePlaceId: place.placeId,
-        businessStatus: place.businessStatus,
-        contactName: contact?.name,
-        contactTitle: contact?.title,
-        contactLinkedInUrl: contact?.profileUrl,
-        outreachStatus: contact ? "contact_found" : undefined,
-      };
-
-      await saveLeads([lead]);
-      console.log(
-        `[cold-call] saved lead "${lead.company}" (${lead.id}) — progress ${results.length + 1}/${total}`,
-      );
-      results.push(lead);
-      onProgress?.({ completed: results.length, total, title: lead.company });
     }
 
     console.log(

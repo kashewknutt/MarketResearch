@@ -19,6 +19,9 @@ type ColumnKey =
   | "companyAddress"
   | "companyWebsite"
   | "businessStatus"
+  | "googleRating"
+  | "googleReviewCount"
+  | "openingHours"
   | "whyFit"
   | "painPoint"
   | "pitchOutline"
@@ -40,6 +43,9 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   companyAddress: "Address",
   companyWebsite: "Website",
   businessStatus: "Business status",
+  googleRating: "Google rating",
+  googleReviewCount: "Google review count",
+  openingHours: "Opening hours",
   whyFit: "Why fit",
   painPoint: "Pain point",
   pitchOutline: "Pitch outline",
@@ -76,6 +82,12 @@ function cellValue(lead: LeadRecord, column: ColumnKey): string {
       return lead.companyWebsite ?? "";
     case "businessStatus":
       return lead.businessStatus ?? "";
+    case "googleRating":
+      return lead.googleRating != null ? String(lead.googleRating) : "";
+    case "googleReviewCount":
+      return lead.googleReviewCount != null ? String(lead.googleReviewCount) : "";
+    case "openingHours":
+      return lead.openingHours ?? "";
     case "whyFit":
       return lead.whyFit ?? "";
     case "painPoint":

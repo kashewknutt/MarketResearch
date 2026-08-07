@@ -21,6 +21,9 @@ type ColumnKey =
   | "companyAddress"
   | "companyWebsite"
   | "businessStatus"
+  | "googleRating"
+  | "googleReviewCount"
+  | "openingHours"
   | "whyFit"
   | "painPoint"
   | "pitchOutline"
@@ -42,6 +45,9 @@ const COLUMN_LABELS: Record<ColumnKey, string> = {
   companyAddress: "Address",
   companyWebsite: "Website",
   businessStatus: "Business status",
+  googleRating: "Google rating",
+  googleReviewCount: "Google review count",
+  openingHours: "Opening hours",
   whyFit: "Why fit",
   painPoint: "Pain point",
   pitchOutline: "Pitch outline",

@@ -435,6 +435,10 @@ export interface LeadRecord {
   companyWebsite?: string;
   googlePlaceId?: string;
   businessStatus?: string;
+  googleRating?: number;
+  googleReviewCount?: number;
+  /** Human-readable weekly hours from Google Places, e.g. "Monday: 9:00 AM – 6:00 PM; ...". */
+  openingHours?: string;
   outreachMessage?: OutreachMessageDraft;
   outreachStatus?: "none" | "contact_found" | "drafted" | "sent";
   outreachUpdatedAt?: string;

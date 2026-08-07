@@ -559,6 +559,17 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
                 </p>
               )}
               {current.companyAddress && <p className="text-slate-500">{current.companyAddress}</p>}
+              {current.googleRating != null && (
+                <p className="text-slate-500">
+                  ★ {current.googleRating.toFixed(1)}
+                  {current.googleReviewCount != null && ` (${current.googleReviewCount} reviews)`}
+                </p>
+              )}
+              {current.openingHours && (
+                <p className="whitespace-pre-wrap text-slate-500">
+                  {current.openingHours.split("; ").join("\n")}
+                </p>
+              )}
               {!current.companyWebsite && current.source === "cold_call" && (
                 <p className="text-slate-400">No website found — cold-call candidate.</p>
               )}
