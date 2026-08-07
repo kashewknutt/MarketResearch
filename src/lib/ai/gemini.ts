@@ -130,6 +130,11 @@ async function executeGeminiCall(
     const classified =
       err instanceof GeminiApiError ? err : classifyGeminiError(err);
 
+    console.error(
+      `[gemini] call failed for task="${trace.operation}" — classified as "${classified.code}". Raw error:`,
+      err,
+    );
+
     await recordApiCostEvent({
       trace,
       usedGoogleSearch: Boolean(config.useGoogleSearch),

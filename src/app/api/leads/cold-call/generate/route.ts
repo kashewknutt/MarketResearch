@@ -36,8 +36,13 @@ export async function POST(request: Request) {
     );
   }
 
+  console.log(
+    `[cold-call] request received: region=${region} city=${city} keyword=${keyword} count=${count}`,
+  );
+
   const profile = await getProfile();
   if (!profile) {
+    console.warn("[cold-call] no onboarding profile found — aborting");
     return Response.json(
       { error: "Complete onboarding before fetching cold-call leads" },
       { status: 400 },
@@ -56,16 +61,26 @@ export async function POST(request: Request) {
         const leads = await discoverColdCallLeads(
           profile,
           { city, region, keyword, campaignContext, count: Math.floor(count) },
-          (progress) => send({ type: "progress", ...progress }),
+          (progress) => {
+            console.log(
+              `[cold-call] progress: ${progress.completed}/${progress.total} — "${progress.title}"`,
+            );
+            send({ type: "progress", ...progress });
+          },
         );
+        console.log(`[cold-call] complete: ${leads.length} lead(s) saved`);
         send({ type: "complete", leads });
       } catch (err) {
+        console.error("[cold-call] pipeline threw:", err);
         if (err instanceof GooglePlacesApiError) {
+          console.error(`[cold-call] Google Places error (${err.code}): ${err.message}`);
           send({ type: "error", error: err.code, message: err.userMessage });
         } else if (isGeminiApiError(err)) {
+          console.error(`[cold-call] Gemini error (${err.code}): ${err.message}`);
           send({ type: "error", error: err.code, message: err.userMessage });
         } else {
           const message = err instanceof Error ? err.message : "Could not fetch cold-call leads";
+          console.error(`[cold-call] unclassified error: ${message}`);
           send({ type: "error", error: "unknown", message });
         }
       } finally {

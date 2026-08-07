@@ -95,17 +95,37 @@ export async function discoverColdCallLeads(
   );
 
   const query = `${params.keyword} in ${params.city}, ${params.region}`;
+  console.log(`[cold-call] searching Google Places: "${query}" (requesting up to ${total * 2})`);
+
   const places = await searchGooglePlacesWithoutWebsite(query, total * 2);
+  console.log(
+    `[cold-call] Google Places returned ${places.length} candidate(s) with phone + no website`,
+  );
+
+  if (places.length === 0) {
+    console.warn(
+      `[cold-call] no qualifying places found for "${query}" — nothing to save. This is not an error, just an empty result set.`,
+    );
+  }
 
   const results: LeadRecord[] = [];
+  let skippedDuplicates = 0;
 
   for (const place of places) {
     if (results.length >= total) break;
 
     const normalized = normalizeCompanyName(place.displayName);
-    if (knownCompanyNames.has(normalized) || knownPlaceIds.has(place.placeId)) continue;
+    if (knownCompanyNames.has(normalized) || knownPlaceIds.has(place.placeId)) {
+      skippedDuplicates++;
+      console.log(`[cold-call] skipping duplicate: "${place.displayName}" (${place.placeId})`);
+      continue;
+    }
     knownCompanyNames.add(normalized);
     knownPlaceIds.add(place.placeId);
+
+    console.log(
+      `[cold-call] processing "${place.displayName}" — phone=${place.phone} address=${place.formattedAddress ?? "n/a"}`,
+    );
 
     const trace: AiCallTrace = {
       operation: "research.cold_call_lead_narrative",
@@ -115,22 +135,32 @@ export async function discoverColdCallLeads(
       researchStage: "leads",
     };
 
-    const narrative = await synthesizeNarrative(
-      profile,
-      {
-        name: place.displayName,
-        address: place.formattedAddress,
-        phone: place.phone,
-        businessStatus: place.businessStatus,
-      },
-      params.campaignContext,
-      trace,
-    );
+    let narrative: Awaited<ReturnType<typeof synthesizeNarrative>>;
+    try {
+      narrative = await synthesizeNarrative(
+        profile,
+        {
+          name: place.displayName,
+          address: place.formattedAddress,
+          phone: place.phone,
+          businessStatus: place.businessStatus,
+        },
+        params.campaignContext,
+        trace,
+      );
+      console.log(`[cold-call] Gemini narrative synthesized for "${place.displayName}"`);
+    } catch (err) {
+      console.error(`[cold-call] Gemini narrative synthesis failed for "${place.displayName}":`, err);
+      throw err;
+    }
 
     const enrichment = await enrichColdCallLead(profile, {
       name: place.displayName,
       address: place.formattedAddress,
     });
+    console.log(
+      `[cold-call] Perplexity enrichment for "${place.displayName}": ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}`,
+    );
 
     const sources: Citation[] = [
       ...(place.googleMapsUri
@@ -162,9 +192,14 @@ export async function discoverColdCallLeads(
     };
 
     await saveLeads([lead]);
+    console.log(`[cold-call] saved lead "${lead.company}" (${lead.id})`);
     results.push(lead);
     onProgress?.({ completed: results.length, total, title: lead.company });
   }
+
+  console.log(
+    `[cold-call] done: ${results.length} lead(s) saved, ${skippedDuplicates} duplicate(s) skipped, ${places.length - results.length - skippedDuplicates} unused candidate(s) left over`,
+  );
 
   return results;
 }

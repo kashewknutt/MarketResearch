@@ -115,33 +115,52 @@ export async function searchGooglePlacesWithoutWebsite(
 ): Promise<GooglePlaceResult[]> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
   if (!apiKey) {
+    console.error("[google-places] GOOGLE_PLACES_API_KEY is not set in this environment");
     throw new GooglePlacesApiError("missing_key", GOOGLE_PLACES_SETUP_MESSAGE);
   }
 
-  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": FIELD_MASK,
-    },
-    body: JSON.stringify({
-      textQuery: query,
-      pageSize: Math.min(Math.max(maxResults, 1), 20),
-    }),
-  });
+  console.log(
+    `[google-places] POST places:searchText — query="${query}" pageSize=${Math.min(Math.max(maxResults, 1), 20)} (key len=${apiKey.length})`,
+  );
+
+  let res: Response;
+  try {
+    res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": FIELD_MASK,
+      },
+      body: JSON.stringify({
+        textQuery: query,
+        pageSize: Math.min(Math.max(maxResults, 1), 20),
+      }),
+    });
+  } catch (err) {
+    console.error("[google-places] fetch itself threw (network-level failure):", err);
+    throw new GooglePlacesApiError(
+      "unavailable",
+      "Could not reach Google Places. Check your network and API key, then try again.",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  console.log(`[google-places] response status: ${res.status}`);
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     const status = body?.error?.status as string | undefined;
     const message = (body?.error?.message as string | undefined) ?? `HTTP ${res.status}`;
+    console.error(`[google-places] error response: status=${status} message=${message}`);
     throw classifyGooglePlacesError(status, message);
   }
 
   const body = (await res.json()) as { places?: RawPlace[] };
   const places = body.places ?? [];
+  console.log(`[google-places] raw results: ${places.length}`);
 
-  return places
+  const filtered = places
     .map((p): GooglePlaceResult | null => {
       const phone = p.internationalPhoneNumber ?? p.nationalPhoneNumber;
       const displayName = p.displayName?.text;
@@ -157,4 +176,10 @@ export async function searchGooglePlacesWithoutWebsite(
     })
     .filter((p): p is GooglePlaceResult => p !== null)
     .slice(0, maxResults);
+
+  console.log(
+    `[google-places] ${filtered.length} of ${places.length} raw result(s) qualify (has phone, no website)`,
+  );
+
+  return filtered;
 }
