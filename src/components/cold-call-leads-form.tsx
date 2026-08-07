@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { LeadRecord } from "@/lib/types/domain";
 
 interface ColdCallLeadsFormProps {
@@ -11,6 +11,27 @@ interface ColdCallLeadsFormProps {
 
 const CUSTOM_REGION_VALUE = "__custom__";
 export const MAX_COLD_CALL_FETCH_COUNT = 10;
+
+const CACHE_KEY = "coldCallLeadsForm:v1";
+
+interface CachedFormValues {
+  regionChoice: string;
+  customRegion: string;
+  city: string;
+  keyword: string;
+  campaignContext: string;
+  count: string;
+}
+
+function loadCachedValues(): Partial<CachedFormValues> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Partial<CachedFormValues>) : {};
+  } catch {
+    return {};
+  }
+}
 
 interface FetchProgress {
   completed: number;
@@ -29,6 +50,30 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<FetchProgress | null>(null);
+
+  // Pre-fill from the last submission, once, after mount (avoids SSR/hydration mismatch).
+  useEffect(() => {
+    const cached = loadCachedValues();
+    if (cached.regionChoice) setRegionChoice(cached.regionChoice);
+    if (cached.customRegion) setCustomRegion(cached.customRegion);
+    if (cached.city) setCity(cached.city);
+    if (cached.keyword) setKeyword(cached.keyword);
+    if (cached.campaignContext) setCampaignContext(cached.campaignContext);
+    if (cached.count) setCount(cached.count);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const values: CachedFormValues = {
+      regionChoice,
+      customRegion,
+      city,
+      keyword,
+      campaignContext,
+      count,
+    };
+    window.localStorage.setItem(CACHE_KEY, JSON.stringify(values));
+  }, [regionChoice, customRegion, city, keyword, campaignContext, count]);
 
   const numericCount = Number(count);
   const canSubmit =
