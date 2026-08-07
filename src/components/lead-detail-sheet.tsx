@@ -23,6 +23,57 @@ interface LeadDetailSheetProps {
   onClose: () => void;
 }
 
+/** Figma-inspector-style collapsible row: uppercase label, chevron, hairline divider — used for every group in this panel so the sidebar reads as one consistent stack instead of a pile of separately-boxed cards. */
+function PanelSection({
+  title,
+  badge,
+  defaultOpen = true,
+  children,
+}: {
+  title: string;
+  badge?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-b border-slate-100 py-3 first:pt-0 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+          {title}
+        </span>
+        <span className="flex items-center gap-2">
+          {badge}
+          <svg
+            viewBox="0 0 12 12"
+            className={`h-3 w-3 shrink-0 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+            fill="none"
+          >
+            <path d="M2.5 4.5 6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      </button>
+      {open && <div className="mt-2.5">{children}</div>}
+    </div>
+  );
+}
+
+/** Compact label used inside a PanelSection for a sub-field (e.g. "Subject" within Outreach). */
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="text-[11px] font-medium text-slate-400">{children}</label>;
+}
+
+const fieldClass =
+  "w-full rounded-md border border-slate-200 px-2 py-1.5 text-xs focus:border-violet-300 focus:outline-none";
+const primaryButtonClass =
+  "rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50";
+const ghostButtonClass =
+  "rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50";
+
 const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
   no_answer: "No answer",
   voicemail: "Voicemail",
@@ -78,13 +129,12 @@ function ContactStatusSection({
   }
 
   return (
-    <section className="rounded-lg border border-slate-100 p-4">
-      <p className="text-sm font-medium text-slate-800">Contact status</p>
-      <div className="mt-3 space-y-2">
+    <PanelSection title="Contact status">
+      <div className="space-y-2">
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value as ContactStatus)}
-          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+          className={`${fieldClass} bg-white`}
         >
           {Object.entries(CONTACT_STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
@@ -97,18 +147,13 @@ function ContactStatusSection({
           onChange={(e) => setRemarks(e.target.value)}
           placeholder="Remarks — why rejected, what's going on, etc. (optional)"
           rows={2}
-          className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+          className={fieldClass}
         />
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving}
-          className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-        >
+        <button type="button" onClick={save} disabled={saving} className={primaryButtonClass}>
           {saving ? "Saving…" : saved ? "Saved" : "Save"}
         </button>
       </div>
-    </section>
+    </PanelSection>
   );
 }
 
@@ -148,15 +193,13 @@ function CallLogSection({ leadId }: { leadId: string }) {
   }
 
   return (
-    <section className="rounded-lg border border-slate-100 p-4">
-      <p className="text-sm font-medium text-slate-800">Call log</p>
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div>
-          <label className="text-xs font-medium text-slate-500">Outcome</label>
+    <PanelSection title="Call log" badge={logs.length > 0 ? <span className="text-[11px] text-slate-400">{logs.length}</span> : undefined}>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={outcome}
             onChange={(e) => setOutcome(e.target.value as CallOutcome)}
-            className="mt-1 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+            className={`${fieldClass} w-auto bg-white`}
           >
             {Object.entries(CALL_OUTCOME_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
@@ -164,36 +207,31 @@ function CallLogSection({ leadId }: { leadId: string }) {
               </option>
             ))}
           </select>
+          <input
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Notes (optional)"
+            className={`${fieldClass} min-w-[8rem] flex-1`}
+          />
+          <button type="button" onClick={logCall} disabled={logging} className={primaryButtonClass}>
+            {logging ? "Logging…" : "Log call"}
+          </button>
         </div>
-        <input
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes (optional)"
-          className="min-w-[10rem] flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-        />
-        <button
-          type="button"
-          onClick={logCall}
-          disabled={logging}
-          className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-        >
-          {logging ? "Logging…" : "Log call"}
-        </button>
-      </div>
 
-      {loaded && logs.length > 0 && (
-        <ul className="mt-3 space-y-2">
-          {logs.map((log) => (
-            <li key={log.id} className="rounded-lg bg-slate-50 p-2 text-xs text-slate-600">
-              <span className="font-medium text-slate-800">{CALL_OUTCOME_LABELS[log.outcome]}</span>
-              {" · "}
-              {new Date(log.calledAt).toLocaleString()}
-              {log.notes && <p className="mt-1 whitespace-pre-wrap">{log.notes}</p>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+        {loaded && logs.length > 0 && (
+          <ul className="space-y-1.5">
+            {logs.map((log) => (
+              <li key={log.id} className="rounded-md bg-slate-50 p-2 text-xs text-slate-600">
+                <span className="font-medium text-slate-800">{CALL_OUTCOME_LABELS[log.outcome]}</span>
+                {" · "}
+                {new Date(log.calledAt).toLocaleString()}
+                {log.notes && <p className="mt-1 whitespace-pre-wrap">{log.notes}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </PanelSection>
   );
 }
 
@@ -288,22 +326,17 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
   }
 
   return (
-    <section className="rounded-lg border border-slate-100 p-4">
-      <p className="text-sm font-medium text-slate-800">Outreach</p>
-
-      <div className="mt-3 space-y-3">
-        <div>
-          <button
-            type="button"
-            onClick={findContact}
-            disabled={findingContact}
-            className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-          >
-            {findingContact ? "Searching…" : "Find contact"}
-          </button>
+    <PanelSection title="Outreach">
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={findContact} disabled={findingContact} className={primaryButtonClass}>
+              {findingContact ? "Searching…" : "Find contact"}
+            </button>
+          </div>
 
           {lead.contactName ? (
-            <div className="mt-2 rounded-lg bg-slate-50 p-3 text-xs">
+            <div className="rounded-md bg-slate-50 p-2.5 text-xs">
               <p className="font-medium text-slate-700">
                 {lead.contactName}
                 {lead.contactTitle && <span className="font-normal text-slate-500"> · {lead.contactTitle}</span>}
@@ -320,100 +353,84 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
               )}
             </div>
           ) : contactNotFound ? (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="text-xs text-slate-500">
               No public decision-maker profile found — you can look one up manually below.
             </p>
           ) : null}
 
           {!lead.contactLinkedInUrl && (
-            <label className="mt-2 block text-xs font-medium text-slate-500">
-              Paste a LinkedIn profile URL manually
+            <div>
+              <FieldLabel>Paste a LinkedIn profile URL manually</FieldLabel>
               <input
                 value={manualUrl}
                 onChange={(e) => setManualUrl(e.target.value)}
                 placeholder="https://www.linkedin.com/in/…"
-                className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                className={`${fieldClass} mt-1`}
               />
-            </label>
+            </div>
           )}
         </div>
 
-        <div>
-          <label className="block text-xs font-medium text-slate-500">
-            Context (optional) — who you&apos;re writing to, recent news, role, etc.
-          </label>
-          <textarea
-            value={context}
-            onChange={(e) => setContext(e.target.value)}
-            rows={2}
-            placeholder="e.g. Writing to their VP of Ops, who recently posted about supply chain delays"
-            className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
-          />
+        <div className="space-y-2 border-t border-slate-50 pt-3">
+          <div>
+            <FieldLabel>Context (optional) — who you&apos;re writing to, recent news, role, etc.</FieldLabel>
+            <textarea
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
+              rows={2}
+              placeholder="e.g. Writing to their VP of Ops, who recently posted about supply chain delays"
+              className={`${fieldClass} mt-1`}
+            />
+          </div>
 
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={draftMessage}
-              disabled={drafting}
-              className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-            >
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={draftMessage} disabled={drafting} className={primaryButtonClass}>
               {drafting ? "Drafting…" : hasDraft ? "Regenerate" : "Draft message"}
             </button>
             {profileUrl && (
-              <a
-                href={profileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
-              >
+              <a href={profileUrl} target="_blank" rel="noopener noreferrer" className={ghostButtonClass}>
                 Open LinkedIn profile
               </a>
             )}
           </div>
 
           {hasDraft && (
-            <div className="mt-2 space-y-2">
+            <div className="space-y-2">
               <div>
-                <label className="text-xs font-medium text-slate-500">Subject</label>
+                <FieldLabel>Subject</FieldLabel>
                 <input
                   value={draft.subject}
                   onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className={`${fieldClass} mt-1`}
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500">Hook line</label>
+                <FieldLabel>Hook line</FieldLabel>
                 <input
                   value={draft.hookLine}
                   onChange={(e) => setDraft((d) => ({ ...d, hookLine: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className={`${fieldClass} mt-1`}
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500">Body</label>
+                <FieldLabel>Body</FieldLabel>
                 <textarea
                   value={draft.body}
                   onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
                   rows={4}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+                  className={`${fieldClass} mt-1`}
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={copyMessage}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50"
-                >
-                  {copied ? "Copied" : "Copy message"}
-                </button>
-              </div>
+              <button type="button" onClick={copyMessage} className={ghostButtonClass}>
+                {copied ? "Copied" : "Copy message"}
+              </button>
             </div>
           )}
         </div>
 
-        <div>
+        <div className="border-t border-slate-50 pt-3">
           {confirmingSent ? (
-            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+            <div className="rounded-md bg-amber-50 p-2.5 text-xs text-amber-800">
               <p>
                 This only records that <em>you</em> sent this message yourself on LinkedIn — there is no way to
                 verify an actual send.
@@ -423,14 +440,14 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
                   type="button"
                   onClick={markSent}
                   disabled={markingSent}
-                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                  className="rounded-md bg-violet-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
                 >
                   {markingSent ? "Saving…" : "Confirm, I sent it"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmingSent(false)}
-                  className="rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100"
+                  className="rounded-md px-2.5 py-1.5 text-xs text-slate-500 hover:bg-slate-100"
                 >
                   Cancel
                 </button>
@@ -441,7 +458,7 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
               type="button"
               onClick={() => setConfirmingSent(true)}
               disabled={lead.outreachStatus === "sent"}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+              className={ghostButtonClass}
             >
               {lead.outreachStatus === "sent" ? "Marked as sent" : "Mark as sent"}
             </button>
@@ -450,7 +467,7 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
 
         {error && <p className="text-xs text-rose-700">{error}</p>}
       </div>
-    </section>
+    </PanelSection>
   );
 }
 
@@ -471,11 +488,45 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
     setTimeout(() => setCopiedMessageIndex(null), 1500);
   };
 
+  const hasDetails = current.companyPhone || current.companyAddress || (current.projectTitle && current.projectId);
+  const hasInsights =
+    current.whyPerfect ||
+    current.whyFit ||
+    current.painPoint ||
+    current.contactPlan ||
+    current.pitchOutline ||
+    current.signals.length > 0 ||
+    (current.objections && current.objections.length > 0);
+
   return (
     <div className="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg flex-col border-l border-slate-100 bg-white shadow-xl">
       <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <h2 className="text-base font-semibold text-slate-800">{current.company}</h2>
-        <div className="flex items-center gap-2">
+        <div className="min-w-0">
+          <h2 className="truncate text-base font-semibold text-slate-800">{current.company}</h2>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-block rounded-full bg-violet-50 px-2 py-0.5 text-[11px] text-violet-700">
+              {current.region} · Fit {current.fitScore}
+            </span>
+            {current.source === "project" && (
+              <span className="inline-block rounded-full bg-sky-50 px-2 py-0.5 text-[11px] text-sky-700">
+                Project lead
+              </span>
+            )}
+            {current.source === "cold_call" && (
+              <span className="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700">
+                Cold call
+              </span>
+            )}
+            {current.projectLeadCategory && (
+              <span
+                className={`inline-block rounded-full px-2 py-0.5 text-[11px] ${PROJECT_LEAD_CATEGORY_COLORS[current.projectLeadCategory]}`}
+              >
+                {PROJECT_LEAD_CATEGORY_LABELS[current.projectLeadCategory]}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-1.5 pl-3">
           <LikeButton entityType="lead" entityId={current.id} />
           <AssignTaskButton
             entityType="lead"
@@ -491,143 +542,132 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
           </button>
         </div>
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-block rounded-full bg-violet-50 px-2 py-0.5 text-xs text-violet-700">
-            {current.region} · Fit {current.fitScore}
-          </span>
-          {current.source === "project" && (
-            <span className="inline-block rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-700">
-              Project lead
-            </span>
-          )}
-          {current.source === "cold_call" && (
-            <span className="inline-block rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-              Cold call
-            </span>
-          )}
-          {current.projectLeadCategory && (
-            <span
-              className={`inline-block rounded-full px-2 py-0.5 text-xs ${PROJECT_LEAD_CATEGORY_COLORS[current.projectLeadCategory]}`}
-            >
-              {PROJECT_LEAD_CATEGORY_LABELS[current.projectLeadCategory]}
-            </span>
-          )}
-        </div>
 
-        {(current.companyPhone || current.companyAddress) && (
-          <section className="rounded-lg border border-slate-100 p-3 text-xs text-slate-700">
-            {current.companyPhone && (
-              <p>
-                <a href={`tel:${current.companyPhone}`} className="font-medium text-violet-700 hover:underline">
-                  {current.companyPhone}
-                </a>
-              </p>
-            )}
-            {current.companyAddress && <p className="mt-1 text-slate-500">{current.companyAddress}</p>}
-            {!current.companyWebsite && current.source === "cold_call" && (
-              <p className="mt-1 text-slate-400">No website found — cold-call candidate.</p>
-            )}
-          </section>
+      <div className="flex-1 overflow-y-auto px-5">
+        {hasDetails && (
+          <PanelSection title="Details">
+            <div className="space-y-2 text-xs text-slate-700">
+              {current.companyPhone && (
+                <p>
+                  <a href={`tel:${current.companyPhone}`} className="font-medium text-violet-700 hover:underline">
+                    {current.companyPhone}
+                  </a>
+                </p>
+              )}
+              {current.companyAddress && <p className="text-slate-500">{current.companyAddress}</p>}
+              {!current.companyWebsite && current.source === "cold_call" && (
+                <p className="text-slate-400">No website found — cold-call candidate.</p>
+              )}
+              {current.projectTitle && current.projectId && (
+                <div className="border-t border-slate-50 pt-2">
+                  <FieldLabel>Linked project</FieldLabel>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetch(`/api/projects?id=${current.projectId}`)
+                        .then((r) => r.json())
+                        .then((d) => {
+                          if (d.project) {
+                            window.dispatchEvent(new CustomEvent("open-project", { detail: d.project }));
+                          } else {
+                            router.push("/projects");
+                          }
+                        })
+                        .catch(() => router.push("/projects"));
+                    }}
+                    className="mt-0.5 block text-sm font-medium text-violet-700 hover:underline"
+                  >
+                    {current.projectTitle}
+                  </button>
+                </div>
+              )}
+            </div>
+          </PanelSection>
         )}
 
-        {current.projectTitle && current.projectId && (
-          <section className="rounded-lg border border-slate-100 p-3">
-            <p className="text-xs font-medium text-slate-500">Linked project</p>
-            <button
-              type="button"
-              onClick={() => {
-                fetch(`/api/projects?id=${current.projectId}`)
-                  .then((r) => r.json())
-                  .then((d) => {
-                    if (d.project) {
-                      window.dispatchEvent(
-                        new CustomEvent("open-project", { detail: d.project }),
-                      );
-                    } else {
-                      router.push("/projects");
-                    }
-                  })
-                  .catch(() => router.push("/projects"));
-              }}
-              className="mt-1 text-sm font-medium text-violet-700 hover:underline"
-            >
-              {current.projectTitle}
-            </button>
-          </section>
+        {hasInsights && (
+          <PanelSection title="Insights">
+            <div className="space-y-3">
+              {(current.whyPerfect || current.whyFit) && (
+                <div>
+                  <FieldLabel>Why this lead is perfect</FieldLabel>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-700">
+                    {current.whyPerfect || current.whyFit}
+                  </p>
+                </div>
+              )}
+
+              {current.painPoint && (
+                <div>
+                  <FieldLabel>Likely pain point</FieldLabel>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-700">{current.painPoint}</p>
+                </div>
+              )}
+
+              {current.pitchOutline && (
+                <div>
+                  <FieldLabel>What to pitch</FieldLabel>
+                  <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-600">{current.pitchOutline}</p>
+                </div>
+              )}
+
+              {current.contactPlan && (
+                <div>
+                  <FieldLabel>How to contact</FieldLabel>
+                  <p className="mt-0.5 whitespace-pre-wrap text-xs text-slate-600">{current.contactPlan}</p>
+                  {current.contactHints && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      <strong className="text-slate-600">Hints:</strong> {current.contactHints}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {current.signals.length > 0 && (
+                <div>
+                  <FieldLabel>Signals</FieldLabel>
+                  <ul className="mt-0.5 list-inside list-disc text-xs text-slate-600">
+                    {current.signals.map((s) => (
+                      <li key={s}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {current.objections && current.objections.length > 0 && (
+                <div>
+                  <FieldLabel>Likely objections</FieldLabel>
+                  <ul className="mt-0.5 list-inside list-disc text-xs text-slate-600">
+                    {current.objections.map((o) => (
+                      <li key={o}>{o}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </PanelSection>
         )}
 
-        {(current.whyPerfect || current.whyFit) && (
-          <section className="rounded-lg bg-violet-50/40 p-4">
-            <p className="text-sm font-medium text-slate-800">Why this lead is perfect</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-700">
-              {current.whyPerfect || current.whyFit}
-            </p>
-          </section>
-        )}
-
-        {current.painPoint && (
-          <section className="rounded-lg bg-amber-50/60 p-4">
-            <p className="text-sm font-medium text-slate-800">Likely pain point</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-700">{current.painPoint}</p>
-          </section>
-        )}
-
-        {current.contactPlan && (
-          <section>
-            <p className="text-sm font-medium text-slate-800">How to contact</p>
-            <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{current.contactPlan}</p>
-            {current.contactHints && (
-              <p className="mt-2 text-xs text-slate-500">
-                <strong className="text-slate-600">Hints:</strong> {current.contactHints}
-              </p>
-            )}
-          </section>
-        )}
-
-        {current.pitchOutline && (
-          <section>
-            <p className="text-sm font-medium text-slate-800">What to pitch</p>
-            <p className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{current.pitchOutline}</p>
-          </section>
-        )}
-
-        {current.signals.length > 0 && (
-          <section>
-            <p className="text-sm font-medium text-slate-800">Signals</p>
-            <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
-              {current.signals.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {current.objections && current.objections.length > 0 && (
-          <section>
-            <p className="text-sm font-medium text-slate-800">Likely objections</p>
-            <ul className="mt-1 list-inside list-disc text-xs text-slate-600">
-              {current.objections.map((o) => (
-                <li key={o}>{o}</li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section>
-          <p className="text-sm font-medium text-slate-800">Citations</p>
+        <PanelSection
+          title="Sources"
+          defaultOpen={false}
+          badge={<span className="text-[11px] text-slate-400">{current.sources.length}</span>}
+        >
           <CitationList citations={current.sources} />
-        </section>
+        </PanelSection>
 
         {current.openingMessages && current.openingMessages.length > 0 && (
-          <section className="rounded-lg border border-slate-100 p-4">
-            <p className="text-sm font-medium text-slate-800">Opening messages</p>
-            <p className="mt-1 text-xs text-slate-500">
+          <PanelSection
+            title="Opening messages"
+            defaultOpen={false}
+            badge={<span className="text-[11px] text-slate-400">{current.openingMessages.length}</span>}
+          >
+            <p className="mb-2 text-xs text-slate-500">
               AI-generated options grounded in this project and lead category.
             </p>
-            <div className="mt-3 space-y-3">
+            <div className="space-y-2.5">
               {current.openingMessages.map((msg, i) => (
-                <div key={i} className="rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+                <div key={i} className="rounded-md bg-slate-50 p-2.5 text-xs text-slate-700">
                   <p className="font-medium text-slate-800">{msg.subject}</p>
                   <p className="mt-1 italic text-slate-500">{msg.hookLine}</p>
                   <p className="mt-1 whitespace-pre-wrap">{msg.body}</p>
@@ -641,7 +681,7 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
                 </div>
               ))}
             </div>
-          </section>
+          </PanelSection>
         )}
 
         <OutreachSection lead={current} onUpdate={setCurrent} />
@@ -650,7 +690,12 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
 
         <CallLogSection leadId={current.id} />
 
-        <CommentThread entityType="lead" entityId={current.id} />
+        <div className="py-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Comments</span>
+          <div className="mt-2.5">
+            <CommentThread entityType="lead" entityId={current.id} />
+          </div>
+        </div>
       </div>
     </div>
   );

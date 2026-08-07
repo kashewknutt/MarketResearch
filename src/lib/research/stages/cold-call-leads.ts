@@ -95,6 +95,9 @@ export async function discoverColdCallLeads(
   onProgress?: (progress: ColdCallProgress) => void,
 ): Promise<LeadRecord[]> {
   const total = Math.min(params.count, MAX_COLD_CALL_FETCH_COUNT);
+  console.log(
+    `[cold-call] requested ${params.count} lead(s) (capped to ${total}) for city="${params.city}" region="${params.region}"`,
+  );
 
   const existingLeads = await getAllLeads();
   const knownCompanyNames = new Set(existingLeads.map((l) => normalizeCompanyName(l.company)));
@@ -211,15 +214,30 @@ export async function discoverColdCallLeads(
       };
 
       await saveLeads([lead]);
-      console.log(`[cold-call] saved lead "${lead.company}" (${lead.id})`);
+      console.log(
+        `[cold-call] saved lead "${lead.company}" (${lead.id}) — progress ${results.length + 1}/${total}`,
+      );
       results.push(lead);
       onProgress?.({ completed: results.length, total, title: lead.company });
     }
+
+    console.log(
+      `[cold-call] after category "${category}": ${results.length}/${total} collected so far`,
+    );
   }
 
   console.log(
-    `[cold-call] done: ${results.length} lead(s) saved across ${categories.length} categor${categories.length === 1 ? "y" : "ies"}, ${skippedDuplicates} duplicate(s) skipped, ${totalQualifying - results.length - skippedDuplicates} unused candidate(s) left over (${totalRawResults} raw Places result(s) total)`,
+    `[cold-call] done: ${results.length} of ${total} requested lead(s) saved across ${categories.length} categor${categories.length === 1 ? "y" : "ies"}, ${skippedDuplicates} duplicate(s) skipped, ${totalQualifying - results.length - skippedDuplicates} unused candidate(s) left over (${totalRawResults} raw Places result(s) total)`,
   );
+
+  if (results.length < total) {
+    console.warn(
+      `[cold-call] SHORTFALL: only found ${results.length} of the ${total} requested lead(s). ` +
+        `This happens when a category's Places search doesn't have enough businesses with a phone ` +
+        `number and no website in "${params.city}, ${params.region}" — not an error, just a limit of ` +
+        `how many real matches exist. Try more categories, a broader city/region, or a lower count.`,
+    );
+  }
 
   return results;
 }
