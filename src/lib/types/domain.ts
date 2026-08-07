@@ -405,6 +405,8 @@ export interface OutreachMessageDraft {
   body: string;
 }
 
+export type ContactStatus = "not_contacted" | "waiting_for_reply" | "in_contact" | "rejected";
+
 export interface LeadRecord {
   id: string;
   company: string;
@@ -436,6 +438,9 @@ export interface LeadRecord {
   outreachMessage?: OutreachMessageDraft;
   outreachStatus?: "none" | "contact_found" | "drafted" | "sent";
   outreachUpdatedAt?: string;
+  /** Real-world contact/call outcome — absent means "not_contacted". Distinct from `status` (funnel stage) and `outreachStatus` (message drafting). */
+  contactStatus?: ContactStatus;
+  contactRemarks?: string;
   source?: LeadSource;
   projectId?: string;
   projectTitle?: string;

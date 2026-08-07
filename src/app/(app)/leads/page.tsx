@@ -8,10 +8,11 @@ import { DataTable } from "@/components/ui/data-table";
 import { LeadDetailSheet } from "@/components/lead-detail-sheet";
 import { NewLeadForm } from "@/components/new-lead-form";
 import { ColdCallLeadsForm } from "@/components/cold-call-leads-form";
+import { ExportLeadsForm } from "@/components/export-leads-form";
 import { LikeCell } from "@/components/like-cell";
 import { PageLoading } from "@/components/ui/page-loading";
 import { useLikeSummaries } from "@/lib/hooks/use-like-summaries";
-import type { LeadRecord, LeadSource } from "@/lib/types/domain";
+import type { ContactStatus, LeadRecord, LeadSource } from "@/lib/types/domain";
 import {
   PROJECT_LEAD_CATEGORY_COLORS,
   PROJECT_LEAD_CATEGORY_LABELS,
@@ -34,6 +35,29 @@ function OutreachBadge({ status }: { status: LeadRecord["outreachStatus"] }) {
   return (
     <span className="inline-block rounded-full bg-slate-50 px-2 py-0.5 text-xs text-slate-600">
       {OUTREACH_LABELS[key]}
+    </span>
+  );
+}
+
+const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
+  not_contacted: "Not contacted",
+  waiting_for_reply: "Waiting for reply",
+  in_contact: "In contact",
+  rejected: "Rejected",
+};
+
+const CONTACT_STATUS_COLORS: Record<ContactStatus, string> = {
+  not_contacted: "bg-slate-50 text-slate-600",
+  waiting_for_reply: "bg-amber-50 text-amber-700",
+  in_contact: "bg-emerald-50 text-emerald-700",
+  rejected: "bg-rose-50 text-rose-700",
+};
+
+function ContactStatusBadge({ status }: { status: LeadRecord["contactStatus"] }) {
+  const key = status ?? "not_contacted";
+  return (
+    <span className={`inline-block rounded-full px-2 py-0.5 text-xs ${CONTACT_STATUS_COLORS[key]}`}>
+      {CONTACT_STATUS_LABELS[key]}
     </span>
   );
 }
@@ -94,13 +118,14 @@ function LeadsPageInner() {
   const [projectTitle, setProjectTitle] = useState<string | null>(null);
   const [showNewLead, setShowNewLead] = useState(false);
   const [showColdCall, setShowColdCall] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [profileRegions, setProfileRegions] = useState<string[]>([]);
 
   const load = useCallback(() => {
     setLoading(true);
     const url = projectId
       ? `/api/leads?projectId=${encodeURIComponent(projectId)}`
-      : `/api/leads?offset=0&limit=${PAGE_SIZE}`;
+      : `/api/leads?offset=0&limit=${PAGE_SIZE}${sourceFilter !== "all" ? `&source=${sourceFilter}` : ""}`;
     fetch(url)
       .then((r) => r.json())
       .then((d) => {
@@ -108,19 +133,20 @@ function LeadsPageInner() {
         setTotal(d.total ?? 0);
       })
       .finally(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, sourceFilter]);
 
   const loadMore = useCallback(() => {
     if (projectId) return;
     setLoadingMore(true);
-    fetch(`/api/leads?offset=${leads.length}&limit=${PAGE_SIZE}`)
+    const url = `/api/leads?offset=${leads.length}&limit=${PAGE_SIZE}${sourceFilter !== "all" ? `&source=${sourceFilter}` : ""}`;
+    fetch(url)
       .then((r) => r.json())
       .then((d) => {
         setLeads((prev) => [...prev, ...(d.leads ?? [])]);
         setTotal(d.total ?? 0);
       })
       .finally(() => setLoadingMore(false));
-  }, [leads.length, projectId]);
+  }, [leads.length, projectId, sourceFilter]);
 
   useEffect(() => {
     load();
@@ -166,14 +192,13 @@ function LeadsPageInner() {
     useMemo(() => leads.map((l) => l.id), [leads]),
   );
 
+  // Source filtering happens server-side (via `source` on /api/leads) so pagination and
+  // `total` stay accurate per tab; only the projectId scoping (a separate fetch branch) is
+  // still applied client-side here since getLeadsByProjectId already returns the full set.
   const filteredLeads = useMemo(() => {
-    let rows = leads;
-    if (projectId) {
-      rows = rows.filter((l) => l.projectId === projectId);
-    }
-    if (sourceFilter === "all") return rows;
-    return rows.filter((l) => (l.source ?? "discovery") === sourceFilter);
-  }, [leads, sourceFilter, projectId]);
+    if (!projectId) return leads;
+    return leads.filter((l) => l.projectId === projectId);
+  }, [leads, projectId]);
 
   const columns = useMemo(
     () =>
@@ -198,6 +223,11 @@ function LeadsPageInner() {
           id: "outreach",
           header: "Outreach",
           cell: ({ row }) => <OutreachBadge status={row.original.outreachStatus} />,
+        }),
+        col.display({
+          id: "contactStatus",
+          header: "Contact status",
+          cell: ({ row }) => <ContactStatusBadge status={row.original.contactStatus} />,
         }),
         col.display({
           id: "sources",
@@ -236,6 +266,13 @@ function LeadsPageInner() {
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             >
               New lead
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowExport(true)}
+              className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Export CSV
             </button>
           </div>
         </div>
@@ -341,11 +378,26 @@ function LeadsPageInner() {
         <ColdCallLeadsForm
           regions={profileRegions}
           onClose={() => setShowColdCall(false)}
-          onFetched={(newLeads) => {
-            setLeads((list) => [...newLeads, ...list]);
-            setTotal((t) => t + newLeads.length);
+          onFetched={() => {
+            // Leads are already saved server-side; switch to the Cold call tab so the count
+            // reflects the server-paginated total for that source instead of guessing at a
+            // local splice. Switching tabs re-triggers load() automatically (see the
+            // useEffect below); if the tab was already "cold_call", setSourceFilter is a
+            // no-op, so load() is called explicitly in that case instead.
             setShowColdCall(false);
+            if (sourceFilter === "cold_call") {
+              load();
+            } else {
+              setSourceFilter("cold_call");
+            }
           }}
+        />
+      )}
+      {showExport && (
+        <ExportLeadsForm
+          currentSourceFilter={sourceFilter}
+          currentTotal={total}
+          onClose={() => setShowExport(false)}
         />
       )}
     </div>

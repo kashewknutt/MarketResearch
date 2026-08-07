@@ -10,7 +10,13 @@ import {
   PROJECT_LEAD_CATEGORY_COLORS,
   PROJECT_LEAD_CATEGORY_LABELS,
 } from "@/lib/project-lead-labels";
-import type { CallOutcome, LeadCallLog, LeadRecord, OutreachMessageDraft } from "@/lib/types/domain";
+import type {
+  CallOutcome,
+  ContactStatus,
+  LeadCallLog,
+  LeadRecord,
+  OutreachMessageDraft,
+} from "@/lib/types/domain";
 
 interface LeadDetailSheetProps {
   lead: LeadRecord | null;
@@ -25,6 +31,86 @@ const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
   callback_later: "Callback later",
   wrong_number: "Wrong number",
 };
+
+const CONTACT_STATUS_LABELS: Record<ContactStatus, string> = {
+  not_contacted: "Not contacted",
+  waiting_for_reply: "Waiting for reply",
+  in_contact: "In contact",
+  rejected: "Rejected",
+};
+
+function ContactStatusSection({
+  lead,
+  onUpdate,
+}: {
+  lead: LeadRecord;
+  onUpdate: (lead: LeadRecord) => void;
+}) {
+  const [status, setStatus] = useState<ContactStatus>(lead.contactStatus ?? "not_contacted");
+  const [remarks, setRemarks] = useState(lead.contactRemarks ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setStatus(lead.contactStatus ?? "not_contacted");
+    setRemarks(lead.contactRemarks ?? "");
+    setSaved(false);
+  }, [lead.id]);
+
+  async function save() {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactStatus: status, contactRemarks: remarks.trim() || undefined }),
+      });
+      if (res.ok) {
+        const { lead: updated } = await res.json();
+        onUpdate(updated);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 1500);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-100 p-4">
+      <p className="text-sm font-medium text-slate-800">Contact status</p>
+      <div className="mt-3 space-y-2">
+        <select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as ContactStatus)}
+          className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm"
+        >
+          {Object.entries(CONTACT_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <textarea
+          value={remarks}
+          onChange={(e) => setRemarks(e.target.value)}
+          placeholder="Remarks — why rejected, what's going on, etc. (optional)"
+          rows={2}
+          className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-sm"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={saving}
+          className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : saved ? "Saved" : "Save"}
+        </button>
+      </div>
+    </section>
+  );
+}
 
 function CallLogSection({ leadId }: { leadId: string }) {
   const [logs, setLogs] = useState<LeadCallLog[]>([]);
@@ -559,6 +645,8 @@ export function LeadDetailSheet({ lead, onClose }: LeadDetailSheetProps) {
         )}
 
         <OutreachSection lead={current} onUpdate={setCurrent} />
+
+        <ContactStatusSection lead={current} onUpdate={setCurrent} />
 
         <CallLogSection leadId={current.id} />
 

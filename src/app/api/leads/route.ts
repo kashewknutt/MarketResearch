@@ -2,9 +2,15 @@ import { NextResponse } from "next/server";
 import { getProfile } from "@/lib/store/settings";
 import { getLeadsByIds, getLeadsByProjectId, getLeadsPage } from "@/lib/store/leads";
 import { runLeadDiscovery } from "@/lib/research/stages/lead-discovery";
+import type { LeadSource } from "@/lib/types/domain";
 import { randomUUID } from "crypto";
 
 const DEFAULT_PAGE_SIZE = 30;
+const VALID_SOURCES: LeadSource[] = ["discovery", "project", "cold_call"];
+
+function parseSource(value: string | null): LeadSource | undefined {
+  return VALID_SOURCES.includes(value as LeadSource) ? (value as LeadSource) : undefined;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -23,8 +29,9 @@ export async function GET(request: Request) {
 
   const offset = Math.max(0, Number(searchParams.get("offset") ?? 0) || 0);
   const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? DEFAULT_PAGE_SIZE) || DEFAULT_PAGE_SIZE));
+  const source = parseSource(searchParams.get("source"));
 
-  const { leads, total } = await getLeadsPage(offset, limit);
+  const { leads, total } = await getLeadsPage(offset, limit, source);
   return NextResponse.json({ leads, total, offset, limit });
 }
 

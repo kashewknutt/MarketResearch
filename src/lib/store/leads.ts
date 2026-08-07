@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { leads } from "@/lib/db/schema";
 import { getCurrentOrg } from "@/lib/auth/session";
-import type { LeadRecord } from "@/lib/types/domain";
+import type { LeadRecord, LeadSource } from "@/lib/types/domain";
 
 export function normalizeCompanyName(name: string): string {
   return name.trim().toLowerCase();
@@ -62,10 +62,19 @@ export interface LeadsPage {
   total: number;
 }
 
-/** Same fitScore-desc ordering as getAllLeads, sliced for incremental loading. */
-export async function getLeadsPage(offset: number, limit: number): Promise<LeadsPage> {
+/**
+ * Same fitScore-desc ordering as getAllLeads, sliced for incremental loading.
+ * When `source` is given, both the page and `total` are scoped to that source
+ * so pagination stays accurate while a source filter tab is active.
+ */
+export async function getLeadsPage(
+  offset: number,
+  limit: number,
+  source?: LeadSource,
+): Promise<LeadsPage> {
   const all = await getAllLeads();
-  return { leads: all.slice(offset, offset + limit), total: all.length };
+  const filtered = source ? all.filter((l) => (l.source ?? "discovery") === source) : all;
+  return { leads: filtered.slice(offset, offset + limit), total: filtered.length };
 }
 
 export async function getLeadById(id: string): Promise<LeadRecord | null> {
