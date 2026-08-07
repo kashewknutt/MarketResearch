@@ -102,30 +102,13 @@ async function executeGeminiCall(
     requestConfig.tools = [{ googleSearch: {} }];
   }
 
+  let response: GenerateResponse;
   try {
-    const response = await ai.models.generateContent({
+    response = await ai.models.generateContent({
       model: MODEL,
       contents: config.contents,
       config: requestConfig,
     });
-
-    const costEvent = await recordApiCostEvent({
-      trace,
-      response,
-      usedGoogleSearch: Boolean(config.useGoogleSearch),
-      success: true,
-      durationMs: Date.now() - started,
-      promptPreview: config.contents,
-    });
-
-    await logAiCall(
-      trace.operation,
-      config.contents,
-      response.text ?? "",
-      costEvent.id,
-    );
-
-    return { response, costEventId: costEvent.id };
   } catch (err) {
     const classified =
       err instanceof GeminiApiError ? err : classifyGeminiError(err);
@@ -146,6 +129,31 @@ async function executeGeminiCall(
 
     throw classified;
   }
+
+  // Cost tracking / logging is auxiliary telemetry — a failure here (e.g. the startup
+  // connectivity ping running outside a request scope, so org-scoped DB writes can't
+  // resolve cookies) must never be mistaken for the Gemini call itself failing.
+  let costEventId = "untracked";
+  try {
+    const costEvent = await recordApiCostEvent({
+      trace,
+      response,
+      usedGoogleSearch: Boolean(config.useGoogleSearch),
+      success: true,
+      durationMs: Date.now() - started,
+      promptPreview: config.contents,
+    });
+    costEventId = costEvent.id;
+
+    await logAiCall(trace.operation, config.contents, response.text ?? "", costEventId);
+  } catch (err) {
+    console.warn(
+      `[gemini] cost tracking/logging failed for task="${trace.operation}" (Gemini call itself succeeded):`,
+      err,
+    );
+  }
+
+  return { response, costEventId };
 }
 
 export async function requireGeminiReady(): Promise<void> {

@@ -148,7 +148,15 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
         }
       }
 
-      if (fetched.length > 0) onFetched(fetched);
+      if (fetched.length > 0) {
+        onFetched(fetched);
+      } else {
+        setError(
+          "No businesses matched that search. Google Maps search works best with a concrete " +
+            "business category (e.g. \"business brokers\" or \"IT consulting agencies\"), not an " +
+            "audience description — try a narrower keyword or a different city.",
+        );
+      }
     } finally {
       setSaving(false);
       setProgress(null);
@@ -218,6 +226,10 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
                 <label className="text-xs font-medium text-slate-500">
                   Business type / keyword
                 </label>
+                <p className="mt-0.5 text-xs text-slate-400">
+                  A single concrete Google Maps category — not an audience description. Who
+                  you&apos;re targeting and why goes in the campaign field below.
+                </p>
                 <input
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   value={keyword}
