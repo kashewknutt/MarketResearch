@@ -6,6 +6,14 @@ import {
 } from "@/lib/research/stages/cold-call-leads";
 import { getProfile } from "@/lib/store/settings";
 
+// Each lead does several sequential AI/API calls (Gemini narrative, Perplexity, LinkedIn
+// lookup) and up to MAX_COLD_CALL_FETCH_COUNT leads can be requested — this can genuinely
+// take minutes. Vercel's default function timeout (10-15s on Hobby, 15s default even on
+// Pro unless overridden) would otherwise kill the request mid-stream after only 1-2 leads.
+// 300s is the Pro-plan ceiling for non-Fluid functions; Hobby plans are still capped lower
+// by the platform regardless of this value.
+export const maxDuration = 300;
+
 function requiredString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }

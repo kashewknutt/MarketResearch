@@ -5,6 +5,7 @@ import type { AiCallTrace } from "@/lib/ai/pricing-types";
 import { safeParse } from "@/lib/agents/validate";
 import { createProvenance } from "@/lib/db/provenance";
 import { searchGooglePlacesWithoutWebsite } from "@/lib/integrations/google-places";
+import { findDecisionMakerContact } from "@/lib/integrations/linkedin-people-search";
 import { enrichColdCallLead } from "@/lib/integrations/perplexity";
 import { getAllLeads, newLeadId, normalizeCompanyName, saveLeads } from "@/lib/store/leads";
 import type { Citation, LeadRecord, OnboardingProfile, RegionCode } from "@/lib/types/domain";
@@ -145,8 +146,10 @@ Return JSON: { "whyFit": string, "painPoint": string, "pitchOutline": string, "c
  * a cold-call-ready segment — via Google Places (New) Text Search. Phone/address/website
  * status come straight from Google's structured data (never AI-guessed); Gemini only
  * writes the pitch narrative around those real facts, and Perplexity optionally adds a
- * few extra cited signals if configured. Entirely separate from the existing
- * discovery/project lead pipelines — does not touch or replace them.
+ * few extra cited signals if configured. Also best-effort looks up a named decision-maker
+ * via LinkedIn (findDecisionMakerContact) since Places only gives a business phone line,
+ * not a person to ask for. Entirely separate from the existing discovery/project lead
+ * pipelines — does not touch or replace them.
  */
 export async function discoverColdCallLeads(
   profile: OnboardingProfile,
@@ -218,31 +221,43 @@ export async function discoverColdCallLeads(
         researchStage: "leads",
       };
 
+      // Narrative synthesis (Gemini, required), Perplexity enrichment, and the LinkedIn
+      // decision-maker lookup are all independent of each other — run them concurrently
+      // instead of sequentially. Sequential per-lead latency (12-16s narrative + 2-3s
+      // Perplexity + several seconds for Apify) was the actual cause of the pipeline only
+      // getting through 1-2 leads before the serverless function's execution time ran out;
+      // this cuts per-lead critical-path time down to whichever of the three is slowest.
+      const stepStarted = Date.now();
       let narrative: Awaited<ReturnType<typeof synthesizeNarrative>>;
+      let enrichment: Awaited<ReturnType<typeof enrichColdCallLead>>;
+      let contact: Awaited<ReturnType<typeof findDecisionMakerContact>>;
       try {
-        narrative = await synthesizeNarrative(
-          profile,
-          {
-            name: place.displayName,
-            address: place.formattedAddress,
-            phone: place.phone,
-            businessStatus: place.businessStatus,
-          },
-          params.campaignContext,
-          trace,
-        );
-        console.log(`[cold-call] Gemini narrative synthesized for "${place.displayName}"`);
+        [narrative, enrichment, contact] = await Promise.all([
+          synthesizeNarrative(
+            profile,
+            {
+              name: place.displayName,
+              address: place.formattedAddress,
+              phone: place.phone,
+              businessStatus: place.businessStatus,
+            },
+            params.campaignContext,
+            trace,
+          ),
+          enrichColdCallLead(profile, { name: place.displayName, address: place.formattedAddress }),
+          // Google Places only gives a business phone line, not a person — best-effort search
+          // for a real, named decision-maker so there's someone to ask for on the call.
+          // Degrades to null if APIFY_API_TOKEN is unset or nothing found; never throws.
+          findDecisionMakerContact(place.displayName),
+        ]);
       } catch (err) {
         console.error(`[cold-call] Gemini narrative synthesis failed for "${place.displayName}":`, err);
         throw err;
       }
-
-      const enrichment = await enrichColdCallLead(profile, {
-        name: place.displayName,
-        address: place.formattedAddress,
-      });
       console.log(
-        `[cold-call] Perplexity enrichment for "${place.displayName}": ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}`,
+        `[cold-call] per-lead lookups done for "${place.displayName}" in ${Date.now() - stepStarted}ms — ` +
+          `narrative ok, Perplexity ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}, ` +
+          `decision-maker ${contact ? `${contact.name} (${contact.title})` : "not found/unavailable"}`,
       );
 
       const sources: Citation[] = [
@@ -258,7 +273,9 @@ export async function discoverColdCallLeads(
         region: params.region,
         fitScore: 60,
         signals: [...narrative.signals, ...(enrichment?.signals ?? [])],
-        contactHints: narrative.contactHints,
+        contactHints: contact
+          ? `Ask for ${contact.name}${contact.title ? ` (${contact.title})` : ""}. ${narrative.contactHints}`
+          : narrative.contactHints,
         whyFit: narrative.whyFit,
         painPoint: narrative.painPoint,
         pitchOutline: narrative.pitchOutline,
@@ -272,6 +289,10 @@ export async function discoverColdCallLeads(
         companyAddress: place.formattedAddress,
         googlePlaceId: place.placeId,
         businessStatus: place.businessStatus,
+        contactName: contact?.name,
+        contactTitle: contact?.title,
+        contactLinkedInUrl: contact?.profileUrl,
+        outreachStatus: contact ? "contact_found" : undefined,
       };
 
       await saveLeads([lead]);
