@@ -337,7 +337,11 @@ function OutreachSection({ lead, onUpdate }: { lead: LeadRecord; onUpdate: (lead
 
           {lead.contactName ? (
             <div className="rounded-md bg-slate-50 p-2.5 text-xs">
-              <p className="font-medium text-slate-700">
+              <p className="text-[11px] text-slate-400">
+                Likely decision-maker at this company (found via LinkedIn, by company name) — not
+                verified as who actually answers the phone line above.
+              </p>
+              <p className="mt-1 font-medium text-slate-700">
                 {lead.contactName}
                 {lead.contactTitle && <span className="font-normal text-slate-500"> · {lead.contactTitle}</span>}
               </p>
