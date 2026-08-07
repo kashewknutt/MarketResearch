@@ -14,7 +14,7 @@ export const MAX_COLD_CALL_FETCH_COUNT = 20;
 export interface ColdCallFetchParams {
   city: string;
   region: RegionCode;
-  /** One or more comma-separated Google Maps business categories — each is run as its own separate Places search. */
+  /** Freeform business type(s)/audience description, comma-separated — resolved into real Google Maps categories via Gemini before searching (see resolveSearchCategories). */
   keyword: string;
   count: number;
   /** What this batch of leads is for — a campaign, offer, or target description that grounds the pitch narrative. */
@@ -27,6 +27,65 @@ function parseCategories(keyword: string): string[] {
     .map((c) => c.trim())
     .filter(Boolean);
   return categories.length > 0 ? categories : [keyword.trim()];
+}
+
+const categoryResolutionSchema = z.object({
+  categories: z.array(z.string().min(1)).min(1).max(6),
+});
+
+/**
+ * Google Maps Text Search only works well against real, concrete business-type queries
+ * ("software companies", "business brokers") — not audience descriptions or niche jargon
+ * ("GTM specialists", "people who need software"). Rather than require the user to already
+ * know Google's category taxonomy, ask Gemini to translate whatever they typed into the
+ * nearest real, commonly-used Maps category per distinct concept, before ever calling Places.
+ * Falls back to a naive comma-split (the old behavior) if this call fails for any reason.
+ */
+async function resolveSearchCategories(
+  profile: OnboardingProfile,
+  keyword: string,
+  campaignContext: string,
+): Promise<string[]> {
+  try {
+    const trace: AiCallTrace = {
+      operation: "research.cold_call_category_resolution",
+      category: "research",
+      correlationId: randomUUID(),
+      researchStage: "leads",
+    };
+
+    const result = await generateStructuredJson({
+      task: "cold_call_category_resolution",
+      systemInstruction:
+        "You translate a business owner's description of who they want to cold-call into real, " +
+        "concrete Google Maps/Google Places business category search terms. Google Maps search only " +
+        "returns good results for terms that match actual business categories real businesses are " +
+        "listed under (e.g. 'software companies', 'business brokers', 'investment firms', 'digital " +
+        "marketing agencies') — not audience descriptions, job titles, or vague concepts (e.g. 'GTM " +
+        "specialists', 'people who need software' are NOT good Maps queries). JSON only.",
+      userPrompt: `Seller: ${profile.businessName} (${profile.serviceDomain}).
+Campaign this call list is for: ${campaignContext}
+The user described the businesses they want to find as: "${keyword}"
+
+For each distinct concept in that description, output the single closest real, commonly-searched Google Maps business category. If a term is already a good concrete category, keep it (lightly cleaned up, e.g. capitalization). If a term is vague, a persona, or jargon, infer the concrete business category those people would actually run or work at that Google Maps would recognize.
+
+Return JSON: { "categories": string[] } — 1 to 6 distinct terms, no duplicates.`,
+      parse: (raw) => {
+        const parsed = safeParse(categoryResolutionSchema, raw);
+        if (!parsed) throw new Error("Invalid category resolution response");
+        return parsed;
+      },
+      trace,
+    });
+
+    return result.data.categories;
+  } catch (err) {
+    console.error(
+      `[cold-call] category resolution failed, falling back to naive comma-split of "${keyword}":`,
+      err,
+    );
+    return parseCategories(keyword);
+  }
 }
 
 export interface ColdCallProgress {
@@ -105,8 +164,10 @@ export async function discoverColdCallLeads(
     existingLeads.map((l) => l.googlePlaceId).filter((id): id is string => Boolean(id)),
   );
 
-  const categories = parseCategories(params.keyword);
-  console.log(`[cold-call] categories to search: ${categories.map((c) => `"${c}"`).join(", ")}`);
+  const categories = await resolveSearchCategories(profile, params.keyword, params.campaignContext);
+  console.log(
+    `[cold-call] resolved "${params.keyword}" -> categories: ${categories.map((c) => `"${c}"`).join(", ")}`,
+  );
 
   const results: LeadRecord[] = [];
   let skippedDuplicates = 0;

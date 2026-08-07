@@ -227,15 +227,15 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
                   Business type / keyword
                 </label>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  One or more concrete Google Maps categories, comma-separated — each runs as its
-                  own search. Not an audience description; who you&apos;re targeting and why goes
-                  in the campaign field below.
+                  One or more business types, comma-separated. Doesn&apos;t need to be exact Google
+                  Maps wording — we&apos;ll translate each into the closest real, searchable
+                  category automatically.
                 </p>
                 <input
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="e.g. digital marketing agencies, IT consulting firms"
+                  placeholder="e.g. investors, business brokers, GTM specialists"
                 />
               </div>
 
