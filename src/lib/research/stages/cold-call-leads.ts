@@ -9,16 +9,24 @@ import { enrichColdCallLead } from "@/lib/integrations/perplexity";
 import { getAllLeads, newLeadId, normalizeCompanyName, saveLeads } from "@/lib/store/leads";
 import type { Citation, LeadRecord, OnboardingProfile, RegionCode } from "@/lib/types/domain";
 
-/** Same cap convention as MAX_ON_DEMAND_FETCH_COUNT / MAX_FETCH_COUNT for on-demand fetches. */
-export const MAX_COLD_CALL_FETCH_COUNT = 10;
+export const MAX_COLD_CALL_FETCH_COUNT = 20;
 
 export interface ColdCallFetchParams {
   city: string;
   region: RegionCode;
+  /** One or more comma-separated Google Maps business categories — each is run as its own separate Places search. */
   keyword: string;
   count: number;
   /** What this batch of leads is for — a campaign, offer, or target description that grounds the pitch narrative. */
   campaignContext: string;
+}
+
+function parseCategories(keyword: string): string[] {
+  const categories = keyword
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  return categories.length > 0 ? categories : [keyword.trim()];
 }
 
 export interface ColdCallProgress {
@@ -94,111 +102,123 @@ export async function discoverColdCallLeads(
     existingLeads.map((l) => l.googlePlaceId).filter((id): id is string => Boolean(id)),
   );
 
-  const query = `${params.keyword} in ${params.city}, ${params.region}`;
-  console.log(`[cold-call] searching Google Places: "${query}" (requesting up to ${total * 2})`);
-
-  const places = await searchGooglePlacesWithoutWebsite(query, total * 2);
-  console.log(
-    `[cold-call] Google Places returned ${places.length} candidate(s) with phone + no website`,
-  );
-
-  if (places.length === 0) {
-    console.warn(
-      `[cold-call] no qualifying places found for "${query}" — nothing to save. This is not an error, just an empty result set.`,
-    );
-  }
+  const categories = parseCategories(params.keyword);
+  console.log(`[cold-call] categories to search: ${categories.map((c) => `"${c}"`).join(", ")}`);
 
   const results: LeadRecord[] = [];
   let skippedDuplicates = 0;
+  let totalRawResults = 0;
+  let totalQualifying = 0;
 
-  for (const place of places) {
+  for (const category of categories) {
     if (results.length >= total) break;
 
-    const normalized = normalizeCompanyName(place.displayName);
-    if (knownCompanyNames.has(normalized) || knownPlaceIds.has(place.placeId)) {
-      skippedDuplicates++;
-      console.log(`[cold-call] skipping duplicate: "${place.displayName}" (${place.placeId})`);
+    const query = `${category} in ${params.city}, ${params.region}`;
+    console.log(`[cold-call] searching Google Places: "${query}" (requesting up to ${total * 2})`);
+
+    const places = await searchGooglePlacesWithoutWebsite(query, total * 2);
+    totalRawResults += places.length;
+    totalQualifying += places.length;
+    console.log(
+      `[cold-call] Google Places returned ${places.length} candidate(s) with phone + no website for "${category}"`,
+    );
+
+    if (places.length === 0) {
+      console.warn(
+        `[cold-call] no qualifying places found for "${query}" — skipping this category. Not an error, just an empty result set.`,
+      );
       continue;
     }
-    knownCompanyNames.add(normalized);
-    knownPlaceIds.add(place.placeId);
 
-    console.log(
-      `[cold-call] processing "${place.displayName}" — phone=${place.phone} address=${place.formattedAddress ?? "n/a"}`,
-    );
+    for (const place of places) {
+      if (results.length >= total) break;
 
-    const trace: AiCallTrace = {
-      operation: "research.cold_call_lead_narrative",
-      category: "research",
-      correlationId: randomUUID(),
-      region: params.region,
-      researchStage: "leads",
-    };
+      const normalized = normalizeCompanyName(place.displayName);
+      if (knownCompanyNames.has(normalized) || knownPlaceIds.has(place.placeId)) {
+        skippedDuplicates++;
+        console.log(`[cold-call] skipping duplicate: "${place.displayName}" (${place.placeId})`);
+        continue;
+      }
+      knownCompanyNames.add(normalized);
+      knownPlaceIds.add(place.placeId);
 
-    let narrative: Awaited<ReturnType<typeof synthesizeNarrative>>;
-    try {
-      narrative = await synthesizeNarrative(
-        profile,
-        {
-          name: place.displayName,
-          address: place.formattedAddress,
-          phone: place.phone,
-          businessStatus: place.businessStatus,
-        },
-        params.campaignContext,
-        trace,
+      console.log(
+        `[cold-call] processing "${place.displayName}" (category="${category}") — phone=${place.phone} address=${place.formattedAddress ?? "n/a"}`,
       );
-      console.log(`[cold-call] Gemini narrative synthesized for "${place.displayName}"`);
-    } catch (err) {
-      console.error(`[cold-call] Gemini narrative synthesis failed for "${place.displayName}":`, err);
-      throw err;
+
+      const trace: AiCallTrace = {
+        operation: "research.cold_call_lead_narrative",
+        category: "research",
+        correlationId: randomUUID(),
+        region: params.region,
+        researchStage: "leads",
+      };
+
+      let narrative: Awaited<ReturnType<typeof synthesizeNarrative>>;
+      try {
+        narrative = await synthesizeNarrative(
+          profile,
+          {
+            name: place.displayName,
+            address: place.formattedAddress,
+            phone: place.phone,
+            businessStatus: place.businessStatus,
+          },
+          params.campaignContext,
+          trace,
+        );
+        console.log(`[cold-call] Gemini narrative synthesized for "${place.displayName}"`);
+      } catch (err) {
+        console.error(`[cold-call] Gemini narrative synthesis failed for "${place.displayName}":`, err);
+        throw err;
+      }
+
+      const enrichment = await enrichColdCallLead(profile, {
+        name: place.displayName,
+        address: place.formattedAddress,
+      });
+      console.log(
+        `[cold-call] Perplexity enrichment for "${place.displayName}": ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}`,
+      );
+
+      const sources: Citation[] = [
+        ...(place.googleMapsUri
+          ? [{ title: "Google Maps listing", uri: place.googleMapsUri }]
+          : []),
+        ...(enrichment?.citations ?? []),
+      ];
+
+      const lead: LeadRecord = {
+        id: newLeadId(),
+        company: place.displayName,
+        region: params.region,
+        fitScore: 60,
+        signals: [...narrative.signals, ...(enrichment?.signals ?? [])],
+        contactHints: narrative.contactHints,
+        whyFit: narrative.whyFit,
+        painPoint: narrative.painPoint,
+        pitchOutline: narrative.pitchOutline,
+        contactPlan: `Campaign: ${params.campaignContext}`,
+        sources,
+        status: "new",
+        provenance: createProvenance("search", sources, 0.8),
+        createdAt: new Date().toISOString(),
+        source: "cold_call",
+        companyPhone: place.phone,
+        companyAddress: place.formattedAddress,
+        googlePlaceId: place.placeId,
+        businessStatus: place.businessStatus,
+      };
+
+      await saveLeads([lead]);
+      console.log(`[cold-call] saved lead "${lead.company}" (${lead.id})`);
+      results.push(lead);
+      onProgress?.({ completed: results.length, total, title: lead.company });
     }
-
-    const enrichment = await enrichColdCallLead(profile, {
-      name: place.displayName,
-      address: place.formattedAddress,
-    });
-    console.log(
-      `[cold-call] Perplexity enrichment for "${place.displayName}": ${enrichment ? `${enrichment.signals.length} signal(s)` : "skipped/unavailable"}`,
-    );
-
-    const sources: Citation[] = [
-      ...(place.googleMapsUri
-        ? [{ title: "Google Maps listing", uri: place.googleMapsUri }]
-        : []),
-      ...(enrichment?.citations ?? []),
-    ];
-
-    const lead: LeadRecord = {
-      id: newLeadId(),
-      company: place.displayName,
-      region: params.region,
-      fitScore: 60,
-      signals: [...narrative.signals, ...(enrichment?.signals ?? [])],
-      contactHints: narrative.contactHints,
-      whyFit: narrative.whyFit,
-      painPoint: narrative.painPoint,
-      pitchOutline: narrative.pitchOutline,
-      contactPlan: `Campaign: ${params.campaignContext}`,
-      sources,
-      status: "new",
-      provenance: createProvenance("search", sources, 0.8),
-      createdAt: new Date().toISOString(),
-      source: "cold_call",
-      companyPhone: place.phone,
-      companyAddress: place.formattedAddress,
-      googlePlaceId: place.placeId,
-      businessStatus: place.businessStatus,
-    };
-
-    await saveLeads([lead]);
-    console.log(`[cold-call] saved lead "${lead.company}" (${lead.id})`);
-    results.push(lead);
-    onProgress?.({ completed: results.length, total, title: lead.company });
   }
 
   console.log(
-    `[cold-call] done: ${results.length} lead(s) saved, ${skippedDuplicates} duplicate(s) skipped, ${places.length - results.length - skippedDuplicates} unused candidate(s) left over`,
+    `[cold-call] done: ${results.length} lead(s) saved across ${categories.length} categor${categories.length === 1 ? "y" : "ies"}, ${skippedDuplicates} duplicate(s) skipped, ${totalQualifying - results.length - skippedDuplicates} unused candidate(s) left over (${totalRawResults} raw Places result(s) total)`,
   );
 
   return results;

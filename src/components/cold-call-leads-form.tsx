@@ -10,7 +10,7 @@ interface ColdCallLeadsFormProps {
 }
 
 const CUSTOM_REGION_VALUE = "__custom__";
-export const MAX_COLD_CALL_FETCH_COUNT = 10;
+export const MAX_COLD_CALL_FETCH_COUNT = 20;
 
 const CACHE_KEY = "coldCallLeadsForm:v1";
 
@@ -227,14 +227,15 @@ export function ColdCallLeadsForm({ regions, onClose, onFetched }: ColdCallLeads
                   Business type / keyword
                 </label>
                 <p className="mt-0.5 text-xs text-slate-400">
-                  A single concrete Google Maps category — not an audience description. Who
-                  you&apos;re targeting and why goes in the campaign field below.
+                  One or more concrete Google Maps categories, comma-separated — each runs as its
+                  own search. Not an audience description; who you&apos;re targeting and why goes
+                  in the campaign field below.
                 </p>
                 <input
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="e.g. digital marketing agencies"
+                  placeholder="e.g. digital marketing agencies, IT consulting firms"
                 />
               </div>
 
